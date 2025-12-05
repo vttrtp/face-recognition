@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Detection - WebAssembly Demo</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            background: #4a90d9;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover {
+            background: #357abd;
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        
+        #status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .status-loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-ready {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .canvas-container {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+        }
+        
+        #canvas {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .results h3 {
+            margin-top: 0;
+        }
+        
+        .face-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .face-list li {
+            padding: 8px;
+            background: white;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #4a90d9;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎭 Face Detection - WebAssembly Demo</h1>
+    
+    <div class="container">
+        <div id="status" class="status-loading">
+            ⏳ Loading face detection module...
+        </div>
+        
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <label class="btn" for="imageInput">📁 Select Image</label>
+                <input type="file" id="imageInput" accept="image/*" disabled>
+            </div>
+            <button id="detectBtn" class="btn" disabled>🔍 Detect Faces</button>
+            <button id="clearBtn" class="btn btn-secondary" disabled>🗑️ Clear</button>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        <div id="results" class="results hidden">
+            <h3>Detection Results</h3>
+            <p id="faceCount"></p>
+            <ul id="faceList" class="face-list"></ul>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let faceDetector = null;
+        let currentImage = null;
+        let Module = null;
+        
+        // DOM elements
+        const statusEl = document.getElementById('status');
+        const imageInput = document.getElementById('imageInput');
+        const detectBtn = document.getElementById('detectBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const resultsEl = document.getElementById('results');
+        const faceCountEl = document.getElementById('faceCount');
+        const faceListEl = document.getElementById('faceList');
+        
+        // Load cascade file
+        async function loadCascadeFile() {
+            const cascadeUrl = 'haarcascade_frontalface_default.xml';
+            try {
+                const response = await fetch(cascadeUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to load cascade file: ${response.status}`);
+                }
+                return await response.text();
+            } catch (error) {
+                console.error('Error loading cascade:', error);
+                throw error;
+            }
+        }
+        
+        // Initialize the module
+        async function init() {
+            try {
+                // Load WASM module
+                Module = await createFaceDetectorModule();
+                
+                // Create detector instance
+                faceDetector = new Module.FaceDetector();
+                
+                // Load cascade classifier
+                statusEl.textContent = '⏳ Loading cascade classifier...';
+                const cascadeData = await loadCascadeFile();
+                
+                if (!faceDetector.loadCascade(cascadeData)) {
+                    throw new Error('Failed to load cascade classifier');
+                }
+                
+                // Enable UI
+                statusEl.textContent = '✅ Ready! Select an image to detect faces.';
+                statusEl.className = 'status-ready';
+                imageInput.disabled = false;
+                
+                // Load default test image
+                await loadDefaultImage();
+                
+            } catch (error) {
+                statusEl.textContent = `❌ Error: ${error.message}`;
+                statusEl.className = 'status-error';
+                console.error('Initialization error:', error);
+            }
+        }
+        
+        // Load default test image
+        async function loadDefaultImage() {
+            try {
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    
+                    // Resize canvas to image size
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    
+                    // Draw image
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // Enable buttons
+                    detectBtn.disabled = false;
+                    clearBtn.disabled = false;
+                };
+                img.onerror = () => {
+                    console.log('Default test image not available');
+                };
+                img.src = 'test_image.jpg';
+            } catch (error) {
+                console.log('Could not load default image:', error);
+            }
+        }
+        
+        // Handle image selection
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    
+                    // Resize canvas to image size
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    
+                    // Draw image
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // Enable buttons
+                    detectBtn.disabled = false;
+                    clearBtn.disabled = false;
+                    
+                    // Hide previous results
+                    resultsEl.classList.add('hidden');
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        // Handle detection
+        detectBtn.addEventListener('click', () => {
+            if (!currentImage || !faceDetector) return;
+            
+            detectBtn.disabled = true;
+            statusEl.textContent = '🔍 Detecting faces...';
+            statusEl.className = 'status-loading';
+            
+            // Use setTimeout to allow UI update
+            setTimeout(() => {
+                try {
+                    // Get image data from canvas
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    // Detect faces and measure time
+                    const startTime = performance.now();
+                    const faces = faceDetector.detectFaces(
+                        imageData.data,
+                        canvas.width,
+                        canvas.height
+                    );
+                    const endTime = performance.now();
+                    const detectionTime = (endTime - startTime).toFixed(1);
+                    
+                    // Redraw original image
+                    ctx.drawImage(currentImage, 0, 0);
+                    
+                    // Draw rectangles around faces with outline for better visibility
+                    ctx.lineWidth = 3;
+                    ctx.font = 'bold 16px Arial';
+                    
+                    faceListEl.innerHTML = '';
+                    
+                    for (let i = 0; i < faces.length; i++) {
+                        const face = faces[i];
+                        
+                        // Draw black outline for rectangle
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 5;
+                        ctx.strokeRect(face.x, face.y, face.width, face.height);
+                        
+                        // Draw green rectangle
+                        ctx.strokeStyle = '#00ff00';
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(face.x, face.y, face.width, face.height);
+                        
+                        // Draw label with outline
+                        const label = `Face ${i + 1}`;
+                        const labelX = face.x;
+                        const labelY = face.y - 8;
+                        
+                        // Black outline for text
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 3;
+                        ctx.strokeText(label, labelX, labelY);
+                        
+                        // Green fill for text
+                        ctx.fillStyle = '#00ff00';
+                        ctx.fillText(label, labelX, labelY);
+                        
+                        // Add to list
+                        const li = document.createElement('li');
+                        li.textContent = `Face ${i + 1}: Position (${face.x}, ${face.y}), Size: ${face.width}×${face.height}`;
+                        faceListEl.appendChild(li);
+                    }
+                    
+                    // Update status and results
+                    faceCountEl.textContent = `Found ${faces.length} face(s)`;
+                    resultsEl.classList.remove('hidden');
+                    
+                    statusEl.textContent = `✅ Detection complete! Found ${faces.length} face(s) in ${detectionTime} ms.`;
+                    statusEl.className = 'status-ready';
+                    
+                } catch (error) {
+                    statusEl.textContent = `❌ Detection error: ${error.message}`;
+                    statusEl.className = 'status-error';
+                    console.error('Detection error:', error);
+                }
+                
+                detectBtn.disabled = false;
+            }, 10);
+        });
+        
+        // Handle clear
+        clearBtn.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.width = 300;
+            canvas.height = 150;
+            currentImage = null;
+            detectBtn.disabled = true;
+            clearBtn.disabled = true;
+            resultsEl.classList.add('hidden');
+            imageInput.value = '';
+        });
+        
+        // Start initialization when module is ready
+        function loadAndInit() {
+            const script = document.createElement('script');
+            script.src = 'face_detector_wasm.js';
+            script.onload = () => {
+                if (typeof createFaceDetectorModule === 'function') {
+                    init();
+                } else {
+                    statusEl.textContent = '❌ Error: Module failed to load properly';
+                    statusEl.className = 'status-error';
+                }
+            };
+            script.onerror = () => {
+                statusEl.textContent = '❌ Error: Failed to load WASM module script';
+                statusEl.className = 'status-error';
+            };
+            document.head.appendChild(script);
+        }
+        
+        // Start when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadAndInit);
+        } else {
+            loadAndInit();
+        }
+    </script>
+</body>
+</html>
