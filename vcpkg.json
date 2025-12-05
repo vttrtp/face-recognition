@@ -1,0 +1,17 @@
+{
+  "name": "face-recognition",
+  "version": "1.0.0",
+  "description": "Face detection library and application",
+  "dependencies": [
+    {
+      "name": "opencv4",
+      "default-features": false,
+      "features": ["jpeg", "png", "calib3d"]
+    },
+    {
+      "name": "gtest",
+      "platform": "!emscripten"
+    },
+    "jsoncpp"
+  ]
+}
