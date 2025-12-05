@@ -5,6 +5,8 @@ A cross-platform C++ application for detecting faces in images. The project cons
 - A console application that processes images recursively and saves results
 - A WebAssembly (WASM) module for browser-based face detection
 
+**[🔗 Live Demo](https://vttrtp.github.io/face-recognition/)**
+
 > **Note:** The application is designed to be cross-platform but has only been tested on Linux and WebAssembly (browser).
 
 ## Features
