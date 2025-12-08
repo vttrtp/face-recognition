@@ -1,15 +1,14 @@
-#ifndef IMAGE_PROCESSOR_HPP
-#define IMAGE_PROCESSOR_HPP
+#pragma once
 
 #include <string>
 #include <vector>
 #include <filesystem>
 
-#include "face_detector.hpp"
+#include "face_detector_interface.h"
 
 namespace app {
 
-class LibraryLoader;
+class FaceDetectorWrapper;
 
 /**
  * @brief Structure to hold processing result for a single image
@@ -17,7 +16,7 @@ class LibraryLoader;
 struct ImageResult {
     std::string original_path;
     std::string result_path;
-    std::vector<face_detector::FaceRect> faces;
+    std::vector<FaceRect> faces;
     bool success;
     std::string error_message;
 };
@@ -31,18 +30,17 @@ struct ImageResult {
 class ImageProcessor {
 public:
     /**
-     * @brief Construct processor with library loader and cascade path
-     * @param loader Reference to loaded library
-     * @param cascade_path Path to Haar cascade file
+     * @brief Construct processor with face detector wrapper
+     * @param detector Reference to face detector wrapper (must outlive this processor)
      */
-    ImageProcessor(LibraryLoader& loader, const std::string& cascade_path);
+    explicit ImageProcessor(FaceDetectorWrapper& detector);
     
-    ~ImageProcessor();
+    ~ImageProcessor() = default;
 
     /**
      * @brief Check if processor is ready
      */
-    bool isReady() const;
+    [[nodiscard]] bool isReady() const;
 
     /**
      * @brief Process all images in a directory recursively
@@ -64,13 +62,6 @@ public:
 
 private:
     /**
-     * @brief Find all image files recursively
-     * @param dir Directory to search
-     * @return Vector of image file paths
-     */
-    std::vector<std::filesystem::path> findImages(const std::filesystem::path& dir);
-
-    /**
      * @brief Process a single image
      * @param image_path Path to input image
      * @param output_dir Directory for output image
@@ -88,13 +79,9 @@ private:
      */
     bool createBlurredImage(const std::string& input_path,
                             const std::string& output_path,
-                            const std::vector<face_detector::FaceRect>& faces);
+                            const std::vector<FaceRect>& faces);
 
-    LibraryLoader& m_loader;
-    void* m_detector;
-    bool m_ready;
+    FaceDetectorWrapper& m_detector;
 };
 
 } // namespace app
-
-#endif // IMAGE_PROCESSOR_HPP

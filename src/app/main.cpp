@@ -1,4 +1,5 @@
 #include "library_loader.hpp"
+#include "face_detector_wrapper.hpp"
 #include "image_processor.hpp"
 
 #include <iostream>
@@ -149,10 +150,17 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Create image processor
-    app::ImageProcessor processor(loader, cascade_path);
-    if (!processor.isReady()) {
+    // Create face detector wrapper
+    app::FaceDetectorWrapper detector(loader, cascade_path);
+    if (!detector.isReady()) {
         std::cerr << "Error: failed to initialize face detector" << std::endl;
+        return 1;
+    }
+
+    // Create image processor
+    app::ImageProcessor processor(detector);
+    if (!processor.isReady()) {
+        std::cerr << "Error: processor not ready" << std::endl;
         return 1;
     }
 

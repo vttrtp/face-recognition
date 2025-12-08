@@ -4,7 +4,6 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/objdetect.hpp>
-#include <vector>
 #include <string>
 #include <fstream>
 #include <cstdio>
@@ -72,10 +71,10 @@ public:
         cv::cvtColor(rgba, bgr, cv::COLOR_RGBA2BGR);
         
         // Use the FaceDetector library's detect method
-        std::vector<face_detector::FaceRect> faces = detector_->detect(bgr);
-        
+        auto detectResult = detector_->detect(bgr);
+
         // Convert FaceRect results to JavaScript array of objects
-        for (const auto& face : faces) {
+        for (const auto& face : detectResult.faces) {
             val faceObj = val::object();
             faceObj.set("x", face.x);
             faceObj.set("y", face.y);
@@ -83,7 +82,7 @@ public:
             faceObj.set("height", face.height);
             result.call<void>("push", faceObj);
         }
-        std::cout << "Detected " << faces.size() << " faces." << std::endl;
+        std::cout << "Detected " << detectResult.faces.size() << " faces." << std::endl;
         return result;
     }
     

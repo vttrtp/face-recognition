@@ -1,28 +1,28 @@
-#ifndef LIBRARY_LOADER_HPP
-#define LIBRARY_LOADER_HPP
+#pragma once
 
 #include <string>
-#include <memory>
-#include <vector>
 
-#include "face_detector.hpp"
+#include "face_detector_interface.h"
 
 namespace app {
 
+// Function pointer types matching the C API
+using CreateDetectorFn = void* (*)(const char*);
+using DestroyDetectorFn = void (*)(void*);
+using DetectFacesFn = DetectionResult* (*)(void*, const char*);
+using GetFacesCountFn = int (*)(const DetectionResult*);
+using GetFacesDataFn = const FaceRect* (*)(const DetectionResult*);
+using FreeDetectionResultFn = void (*)(DetectionResult*);
+
 /**
- * @brief Dynamic library loader for face_detector
+ * @brief Minimal dynamic library loader for face_detector
  * 
- * Loads the face_detector shared library at runtime and provides
- * access to its functions through the C API.
+ * Loads the face_detector shared library at runtime and exposes
+ * raw function pointers. Use FaceDetectorClient for a safe C++ wrapper.
  */
 class LibraryLoader {
 public:
-    /**
-     * @brief Construct loader and load the library
-     * @param library_path Path to the shared library file
-     */
     explicit LibraryLoader(const std::string& library_path);
-    
     ~LibraryLoader();
     
     // Non-copyable
@@ -33,47 +33,19 @@ public:
     LibraryLoader(LibraryLoader&&) noexcept;
     LibraryLoader& operator=(LibraryLoader&&) noexcept;
 
-    /**
-     * @brief Check if library was loaded successfully
-     */
-    bool isLoaded() const;
+    [[nodiscard]] bool isLoaded() const noexcept { return handle_ != nullptr; }
+    [[nodiscard]] explicit operator bool() const noexcept { return isLoaded(); }
 
-    /**
-     * @brief Create a face detector instance
-     * @param cascade_path Path to Haar cascade XML file
-     * @return Opaque pointer to detector, or nullptr on failure
-     */
-    void* createDetector(const std::string& cascade_path);
-
-    /**
-     * @brief Destroy a face detector instance
-     * @param detector Pointer obtained from createDetector
-     */
-    void destroyDetector(void* detector);
-
-    /**
-     * @brief Check if detector is properly loaded
-     * @param detector Pointer to detector
-     * @return true if detector is ready
-     */
-    bool isDetectorLoaded(void* detector);
-
-    /**
-     * @brief Detect faces in an image
-     * @param detector Pointer to detector
-     * @param image_path Path to image file
-     * @param out_faces Output buffer for face rectangles
-     * @param max_faces Maximum number of faces to return
-     * @return Number of faces found, or -1 on error
-     */
-    int detectFaces(void* detector, const std::string& image_path,
-                    face_detector::FaceRect* out_faces, int max_faces);
+    // Raw function pointers - use FaceDetectorClient for safe wrapper
+    CreateDetectorFn createDetector = nullptr;
+    DestroyDetectorFn destroyDetector = nullptr;
+    DetectFacesFn detectFaces = nullptr;
+    GetFacesCountFn getFacesCount = nullptr;
+    GetFacesDataFn getFacesData = nullptr;
+    FreeDetectionResultFn freeDetectionResult = nullptr;
 
 private:
-    class Impl;
-    std::unique_ptr<Impl> pImpl;
+    void* handle_ = nullptr;
 };
 
 } // namespace app
-
-#endif // LIBRARY_LOADER_HPP

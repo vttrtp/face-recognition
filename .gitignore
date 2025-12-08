@@ -20,15 +20,6 @@ build-*/
 *.a
 *.lib
 
-# CMake generated files
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-*.cmake
-!CMakeLists.txt
-!cmake/*.cmake
-
 # vcpkg
 vcpkg_installed/
 

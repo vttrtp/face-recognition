@@ -1,5 +1,6 @@
 #include "image_processor.hpp"
-#include "library_loader.hpp"
+#include "face_detector_wrapper.hpp"
+#include "file_utils.hpp"
 
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
@@ -19,66 +20,17 @@ static const std::vector<std::string> IMAGE_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"
 };
 
-ImageProcessor::ImageProcessor(LibraryLoader& loader, const std::string& cascade_path)
-    : m_loader(loader)
-    , m_detector(nullptr)
-    , m_ready(false) {
-    
-    if (!m_loader.isLoaded()) {
-        std::cerr << "[ImageProcessor] Library not loaded" << std::endl;
-        return;
-    }
-
-    m_detector = m_loader.createDetector(cascade_path);
-    if (!m_detector) {
-        std::cerr << "[ImageProcessor] Failed to create detector" << std::endl;
-        return;
-    }
-
-    m_ready = m_loader.isDetectorLoaded(m_detector);
-    if (!m_ready) {
-        std::cerr << "[ImageProcessor] Detector not properly initialized" << std::endl;
-    }
-}
-
-ImageProcessor::~ImageProcessor() {
-    if (m_detector) {
-        m_loader.destroyDetector(m_detector);
-    }
+ImageProcessor::ImageProcessor(FaceDetectorWrapper& detector)
+    : m_detector(detector) {
 }
 
 bool ImageProcessor::isReady() const {
-    return m_ready;
-}
-
-std::vector<fs::path> ImageProcessor::findImages(const fs::path& dir) {
-    std::vector<fs::path> images;
-
-    try {
-        for (const auto& entry : fs::recursive_directory_iterator(dir)) {
-            if (!entry.is_regular_file()) {
-                continue;
-            }
-
-            std::string ext = entry.path().extension().string();
-            // Convert to lowercase for comparison
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            if (std::find(IMAGE_EXTENSIONS.begin(), IMAGE_EXTENSIONS.end(), ext) 
-                != IMAGE_EXTENSIONS.end()) {
-                images.push_back(entry.path());
-            }
-        }
-    } catch (const fs::filesystem_error& e) {
-        std::cerr << "[ImageProcessor] Filesystem error: " << e.what() << std::endl;
-    }
-
-    return images;
+    return m_detector.isReady();
 }
 
 bool ImageProcessor::createBlurredImage(const std::string& input_path,
                                          const std::string& output_path,
-                                         const std::vector<face_detector::FaceRect>& faces) {
+                                         const std::vector<FaceRect>& faces) {
     cv::Mat image = cv::imread(input_path);
     if (image.empty()) {
         return false;
@@ -125,24 +77,10 @@ ImageResult ImageProcessor::processImage(const fs::path& image_path,
     result.original_path = image_path.string();
     result.success = false;
 
-    // Maximum faces to detect per image
-    constexpr int MAX_FACES = 100;
-    std::vector<face_detector::FaceRect> faces(MAX_FACES);
-
-    int face_count = m_loader.detectFaces(
-        m_detector,
-        image_path.string(),
-        faces.data(),
-        MAX_FACES
-    );
-
-    if (face_count < 0) {
-        result.error_message = "Detection failed";
-        return result;
-    }
-
-    faces.resize(face_count);
-    result.faces = faces;
+    auto detection = m_detector.detect(image_path.string());
+    
+    // Copy faces to vector
+    std::vector<FaceRect> faces_vec = detection.toVector();
 
     // Generate output filename: original_name_result.jpg
     std::string stem = image_path.stem().string();
@@ -158,10 +96,13 @@ ImageResult ImageProcessor::processImage(const fs::path& image_path,
 
     result.result_path = output_path.string();
 
-    if (!createBlurredImage(image_path.string(), output_path.string(), faces)) {
+    if (!createBlurredImage(image_path.string(), output_path.string(), faces_vec)) {
         result.error_message = "Failed to create output image";
         return result;
     }
+
+    // Move faces to result for JSON output
+    result.faces = std::move(faces_vec);
 
     result.success = true;
     return result;
@@ -179,7 +120,7 @@ std::vector<ImageResult> ImageProcessor::processDirectory(const std::string& inp
         return results;
     }
 
-    auto images = findImages(input_path);
+    auto images = findFiles(input_path, IMAGE_EXTENSIONS);
     std::cout << "[ImageProcessor] Found " << images.size() << " images to process" << std::endl;
 
     results.reserve(images.size());

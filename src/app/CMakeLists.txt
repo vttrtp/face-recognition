@@ -4,6 +4,8 @@ add_executable(${APP_NAME}
     main.cpp
     image_processor.cpp
     library_loader.cpp
+    face_detector_wrapper.cpp
+    file_utils.cpp
 )
 
 target_include_directories(${APP_NAME}
@@ -30,12 +32,24 @@ if(EXISTS "${CMAKE_BINARY_DIR}/data")
     )
 endif()
 
-# Copy the library next to executable for convenience
-add_custom_command(TARGET ${APP_NAME} POST_BUILD
+# Copy the library next to executable - re-runs when library changes
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/libface_detector_copied"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:face_detector>"
         "$<TARGET_FILE_DIR:${APP_NAME}>"
+    COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/libface_detector_copied"
+    DEPENDS face_detector
     COMMENT "Copying face_detector library to output directory"
 )
 
+add_custom_target(copy_face_detector_lib ALL
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libface_detector_copied"
+)
+
 add_dependencies(${APP_NAME} face_detector)
+
+# Install target
+install(TARGETS ${APP_NAME}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
