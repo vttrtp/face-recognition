@@ -82,7 +82,6 @@ public:
             faceObj.set("height", face.height);
             result.call<void>("push", faceObj);
         }
-        std::cout << "Detected " << detectResult.faces.size() << " faces." << std::endl;
         return result;
     }
     

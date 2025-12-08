@@ -42,7 +42,8 @@ cd vcpkg
 ### Emscripten SDK (for WASM build)
 
 ```bash
-# Clone and install emsdk
+# Clone and install emsdk (should be at ../emsdk relative to this project)
+cd ..
 git clone https://github.com/emscripten-core/emsdk.git
 cd emsdk
 ./emsdk install latest
@@ -50,7 +51,7 @@ cd emsdk
 source ./emsdk_env.sh   # Linux/macOS
 ```
 
-**Note:** Update the `EMSDK` path in `CMakePresets.json` to match your installation location.
+**Note:** Update the `EMSDK` path in `CMakePresets.json` to match your installation location if needed.
 
 ## Dependencies
 

@@ -35,6 +35,8 @@ DetectResult FaceDetector::detect(const cv::Mat& image) {
     // Enhance contrast for better detection
     cv::equalizeHist(gray, gray);
 
+    auto start = std::chrono::steady_clock::now();
+
     std::vector<cv::Rect> cvFaces;
     cascade_.detectMultiScale(
         gray,
@@ -45,10 +47,16 @@ DetectResult FaceDetector::detect(const cv::Mat& image) {
         cv::Size(60, 60)  // min face size - ignore small detections
     );
 
+    auto end = std::chrono::steady_clock::now();
+    auto duration_ms = std::chrono::duration<double, std::milli>(end - start).count();
+
     result.faces.reserve(cvFaces.size());
     for (const auto& face : cvFaces) {
         result.faces.push_back({face.x, face.y, face.width, face.height});
     }
+
+    std::cout << "[FaceDetector] Faces found: " << result.faces.size() 
+              << " | Time: " << duration_ms << " ms" << std::endl;
 
     return result;
 }
@@ -65,16 +73,8 @@ DetectResult FaceDetector::detect(std::string_view image_path) {
         return {};
     }
 
-    auto start = std::chrono::steady_clock::now();
-    auto result = detect(image);
-    auto end = std::chrono::steady_clock::now();
-    auto duration_ms = std::chrono::duration<double, std::milli>(end - start).count();
-
-    std::cout << "[FaceDetector] Processed: " << image_path 
-              << " | Faces found: " << result.faces.size() 
-              << " | Time: " << duration_ms << " ms" << std::endl;
-
-    return result;
+    std::cout << "[FaceDetector] Processing: " << image_path << std::endl;
+    return detect(image);
 }
 
 } // namespace face_detector

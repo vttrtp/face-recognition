@@ -18,7 +18,7 @@ using FreeDetectionResultFn = void (*)(DetectionResult*);
  * @brief Minimal dynamic library loader for face_detector
  * 
  * Loads the face_detector shared library at runtime and exposes
- * raw function pointers. Use FaceDetectorClient for a safe C++ wrapper.
+ * raw function pointers. Use FaceDetectorWrapper for a safe C++ wrapper.
  */
 class LibraryLoader {
 public:
@@ -36,7 +36,7 @@ public:
     [[nodiscard]] bool isLoaded() const noexcept { return handle_ != nullptr; }
     [[nodiscard]] explicit operator bool() const noexcept { return isLoaded(); }
 
-    // Raw function pointers - use FaceDetectorClient for safe wrapper
+    // Raw function pointers - use FaceDetectorWrapper for safe wrapper
     CreateDetectorFn createDetector = nullptr;
     DestroyDetectorFn destroyDetector = nullptr;
     DetectFacesFn detectFaces = nullptr;

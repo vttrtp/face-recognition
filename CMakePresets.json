@@ -9,6 +9,8 @@
         "VCPKG_ROOT": "${sourceDir}/../vcpkg"
       },
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VCPKG_BUILD_TYPE": "release",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_MANIFEST_MODE": "ON",
         "VCPKG_MANIFEST_INSTALL": "ON"
@@ -17,17 +19,15 @@
     {
       "name": "default",
       "inherits": "base",
-      "binaryDir": "${sourceDir}/build",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
+      "binaryDir": "${sourceDir}/build"
     },
     {
       "name": "debug",
       "inherits": "base",
       "binaryDir": "${sourceDir}/build-debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_BUILD_TYPE": "debug"
       }
     },
     {
@@ -35,10 +35,9 @@
       "inherits": "base",
       "binaryDir": "${sourceDir}/build-wasm",
       "environment": {
-        "EMSDK": "${sourceDir}/../viewer/3rdparty-wasm/emsdk"
+        "EMSDK": "${sourceDir}/../emsdk"
       },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
         "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
         "VCPKG_TARGET_TRIPLET": "wasm32-emscripten",
         "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
