@@ -1,58 +1,56 @@
 #include "face_detector_wrapper.hpp"
-#include "library_loader.hpp"
-
-#include <utility>
+#include "face_detector_library.hpp"
 
 namespace app {
 
 // DetectionResultData implementation
 
-DetectionResultData::DetectionResultData(LibraryLoader& loader, DetectionResult* result)
-    : loader_(&loader)
-    , result_(result, [&loader](DetectionResult* r) {
+DetectionResultData::DetectionResultData(DetectionResult* result)
+    : result_(result, [](DetectionResult* r) {
         if (r) {
-            loader.freeDetectionResult(r);
+            FaceDetectorLibrary::instance().freeDetectionResult(r);
         }
     }) {
 }
 
 int DetectionResultData::count() const {
-    if (!loader_ || !result_) {
+    if (!result_) {
         return 0;
     }
-    int c = loader_->getFacesCount(result_.get());
+    int c = FaceDetectorLibrary::instance().getFacesCount(result_.get());
     return c > 0 ? c : 0;
 }
 
 const FaceRect* DetectionResultData::data() const {
-    if (!loader_ || !result_) {
+    if (!result_) {
         return nullptr;
     }
-    return loader_->getFacesData(result_.get());
+    return FaceDetectorLibrary::instance().getFacesData(result_.get());
 }
 
 // FaceDetectorWrapper implementation
 
-FaceDetectorWrapper::FaceDetectorWrapper(LibraryLoader& loader, const std::string& cascade_path)
-    : loader_(&loader)
-    , detector_(nullptr, [](void*){}) {
-    if (loader_->isLoaded()) {
-        auto* det = loader_->createDetector(cascade_path.c_str());
-        detector_ = std::unique_ptr<void, Deleter>(det, [&loader](void* d) {
+FaceDetectorWrapper::FaceDetectorWrapper(const std::string& cascade_path)
+    : detector_(nullptr, [](void*){}) {
+    auto& lib = FaceDetectorLibrary::instance();
+    if (lib.isLoaded()) {
+        auto* det = lib.createDetector(cascade_path.c_str());
+        detector_ = std::unique_ptr<void, Deleter>(det, [](void* d) {
             if (d) {
-                loader.destroyDetector(d);
+                FaceDetectorLibrary::instance().destroyDetector(d);
             }
         });
     }
 }
 
 DetectionResultData FaceDetectorWrapper::detect(std::string_view image_path) {
-    if (!loader_ || !detector_) {
+    if (!detector_) {
         return {};
     }
     
-    DetectionResult* result = loader_->detectFaces(detector_.get(), std::string(image_path).c_str());
-    return DetectionResultData(*loader_, result);
+    auto& lib = FaceDetectorLibrary::instance();
+    DetectionResult* result = lib.detectFaces(detector_.get(), std::string(image_path).c_str());
+    return DetectionResultData(result);
 }
 
 } // namespace app

@@ -9,8 +9,6 @@
 
 namespace app {
 
-class LibraryLoader;
-
 /**
  * @brief RAII wrapper for raw DetectionResult from C API
  */
@@ -19,7 +17,7 @@ public:
     using Deleter = std::function<void(DetectionResult*)>;
 
     DetectionResultData() = default;
-    DetectionResultData(LibraryLoader& loader, DetectionResult* result);
+    explicit DetectionResultData(DetectionResult* result);
     ~DetectionResultData() = default;
     
     // Non-copyable
@@ -34,26 +32,26 @@ public:
     [[nodiscard]] const FaceRect* data() const;
 
 private:
-    LibraryLoader* loader_ = nullptr;
     std::unique_ptr<DetectionResult, Deleter> result_;
 };
 
 /**
- * @brief Safe C++ wrapper for face detector loaded via LibraryLoader
+ * @brief Safe C++ wrapper for face detector loaded via FaceDetectorLibrary
  * 
  * Provides RAII management of detector lifetime and type-safe interface.
  * No raw pointers exposed in the public API.
+ * Uses FaceDetectorLibrary singleton internally.
  */
 class FaceDetectorWrapper {
 public:
     using Deleter = std::function<void(void*)>;
 
     /**
-     * @brief Construct wrapper with library loader and cascade path
-     * @param loader Reference to loaded library (must outlive this wrapper)
+     * @brief Construct wrapper with cascade path
      * @param cascade_path Path to Haar cascade XML file
+     * @note LibraryLoader must be initialized before creating wrapper
      */
-    FaceDetectorWrapper(LibraryLoader& loader, const std::string& cascade_path);
+    explicit FaceDetectorWrapper(const std::string& cascade_path);
     
     ~FaceDetectorWrapper() = default;
     
@@ -79,7 +77,6 @@ public:
     [[nodiscard]] DetectionResultData detect(std::string_view image_path);
 
 private:
-    LibraryLoader* loader_ = nullptr;
     std::unique_ptr<void, Deleter> detector_;
 };
 

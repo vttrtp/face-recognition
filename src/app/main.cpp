@@ -1,4 +1,4 @@
-#include "library_loader.hpp"
+#include "face_detector_library.hpp"
 #include "face_detector_wrapper.hpp"
 #include "image_processor.hpp"
 #include "file_utils.hpp"
@@ -133,15 +133,14 @@ int main(int argc, char* argv[]) {
     std::cout << "Output directory: " << (output_dir.empty() ? input_dir : output_dir) << std::endl;
     std::cout << "====================================" << std::endl;
 
-    // Load the library dynamically
-    app::LibraryLoader loader(library_path);
-    if (!loader.isLoaded()) {
+    // Load the face detector library dynamically (singleton)
+    if (!app::FaceDetectorLibrary::initialize(library_path)) {
         std::cerr << "Error: failed to load face_detector library" << std::endl;
         return 1;
     }
 
     // Create face detector wrapper
-    app::FaceDetectorWrapper detector(loader, cascade_path);
+    app::FaceDetectorWrapper detector(cascade_path);
     if (!detector.isReady()) {
         std::cerr << "Error: failed to initialize face detector" << std::endl;
         return 1;
