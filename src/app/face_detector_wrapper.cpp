@@ -9,36 +9,18 @@ namespace app {
 
 DetectionResultData::DetectionResultData(LibraryLoader& loader, DetectionResult* result)
     : loader_(&loader)
-    , result_(result) {
-}
-
-DetectionResultData::~DetectionResultData() {
-    if (loader_ && result_) {
-        loader_->freeDetectionResult(result_);
-    }
-}
-
-DetectionResultData::DetectionResultData(DetectionResultData&& other) noexcept
-    : loader_(std::exchange(other.loader_, nullptr))
-    , result_(std::exchange(other.result_, nullptr)) {
-}
-
-DetectionResultData& DetectionResultData::operator=(DetectionResultData&& other) noexcept {
-    if (this != &other) {
-        if (loader_ && result_) {
-            loader_->freeDetectionResult(result_);
+    , result_(result, [&loader](DetectionResult* r) {
+        if (r) {
+            loader.freeDetectionResult(r);
         }
-        loader_ = std::exchange(other.loader_, nullptr);
-        result_ = std::exchange(other.result_, nullptr);
-    }
-    return *this;
+    }) {
 }
 
 int DetectionResultData::count() const {
     if (!loader_ || !result_) {
         return 0;
     }
-    int c = loader_->getFacesCount(result_);
+    int c = loader_->getFacesCount(result_.get());
     return c > 0 ? c : 0;
 }
 
@@ -46,42 +28,22 @@ const FaceRect* DetectionResultData::data() const {
     if (!loader_ || !result_) {
         return nullptr;
     }
-    return loader_->getFacesData(result_);
+    return loader_->getFacesData(result_.get());
 }
 
 // FaceDetectorWrapper implementation
 
 FaceDetectorWrapper::FaceDetectorWrapper(LibraryLoader& loader, const std::string& cascade_path)
-    : loader_(&loader) {
+    : loader_(&loader)
+    , detector_(nullptr, [](void*){}) {
     if (loader_->isLoaded()) {
-        detector_ = loader_->createDetector(cascade_path.c_str());
+        auto* det = loader_->createDetector(cascade_path.c_str());
+        detector_ = std::unique_ptr<void, Deleter>(det, [&loader](void* d) {
+            if (d) {
+                loader.destroyDetector(d);
+            }
+        });
     }
-}
-
-FaceDetectorWrapper::~FaceDetectorWrapper() {
-    if (loader_ && detector_) {
-        loader_->destroyDetector(detector_);
-    }
-}
-
-FaceDetectorWrapper::FaceDetectorWrapper(FaceDetectorWrapper&& other) noexcept
-    : loader_(other.loader_)
-    , detector_(other.detector_) {
-    other.loader_ = nullptr;
-    other.detector_ = nullptr;
-}
-
-FaceDetectorWrapper& FaceDetectorWrapper::operator=(FaceDetectorWrapper&& other) noexcept {
-    if (this != &other) {
-        if (loader_ && detector_) {
-            loader_->destroyDetector(detector_);
-        }
-        loader_ = other.loader_;
-        detector_ = other.detector_;
-        other.loader_ = nullptr;
-        other.detector_ = nullptr;
-    }
-    return *this;
 }
 
 DetectionResultData FaceDetectorWrapper::detect(std::string_view image_path) {
@@ -89,7 +51,7 @@ DetectionResultData FaceDetectorWrapper::detect(std::string_view image_path) {
         return {};
     }
     
-    DetectionResult* result = loader_->detectFaces(detector_, std::string(image_path).c_str());
+    DetectionResult* result = loader_->detectFaces(detector_.get(), std::string(image_path).c_str());
     return DetectionResultData(*loader_, result);
 }
 

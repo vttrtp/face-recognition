@@ -2,6 +2,8 @@
 
 #include <string>
 #include <string_view>
+#include <memory>
+#include <functional>
 
 #include "face_detector_interface.h"
 
@@ -14,24 +16,26 @@ class LibraryLoader;
  */
 class DetectionResultData {
 public:
+    using Deleter = std::function<void(DetectionResult*)>;
+
     DetectionResultData() = default;
     DetectionResultData(LibraryLoader& loader, DetectionResult* result);
-    ~DetectionResultData();
+    ~DetectionResultData() = default;
     
     // Non-copyable
     DetectionResultData(const DetectionResultData&) = delete;
     DetectionResultData& operator=(const DetectionResultData&) = delete;
     
     // Movable
-    DetectionResultData(DetectionResultData&& other) noexcept;
-    DetectionResultData& operator=(DetectionResultData&& other) noexcept;
+    DetectionResultData(DetectionResultData&&) noexcept = default;
+    DetectionResultData& operator=(DetectionResultData&&) noexcept = default;
     
     [[nodiscard]] int count() const;
     [[nodiscard]] const FaceRect* data() const;
 
 private:
     LibraryLoader* loader_ = nullptr;
-    DetectionResult* result_ = nullptr;
+    std::unique_ptr<DetectionResult, Deleter> result_;
 };
 
 /**
@@ -42,6 +46,8 @@ private:
  */
 class FaceDetectorWrapper {
 public:
+    using Deleter = std::function<void(void*)>;
+
     /**
      * @brief Construct wrapper with library loader and cascade path
      * @param loader Reference to loaded library (must outlive this wrapper)
@@ -49,15 +55,15 @@ public:
      */
     FaceDetectorWrapper(LibraryLoader& loader, const std::string& cascade_path);
     
-    ~FaceDetectorWrapper();
+    ~FaceDetectorWrapper() = default;
     
     // Non-copyable
     FaceDetectorWrapper(const FaceDetectorWrapper&) = delete;
     FaceDetectorWrapper& operator=(const FaceDetectorWrapper&) = delete;
     
     // Movable
-    FaceDetectorWrapper(FaceDetectorWrapper&& other) noexcept;
-    FaceDetectorWrapper& operator=(FaceDetectorWrapper&& other) noexcept;
+    FaceDetectorWrapper(FaceDetectorWrapper&&) noexcept = default;
+    FaceDetectorWrapper& operator=(FaceDetectorWrapper&&) noexcept = default;
 
     /**
      * @brief Check if detector is ready
@@ -74,7 +80,7 @@ public:
 
 private:
     LibraryLoader* loader_ = nullptr;
-    void* detector_ = nullptr;
+    std::unique_ptr<void, Deleter> detector_;
 };
 
 } // namespace app
