@@ -86,7 +86,7 @@ Managed via vcpkg:
 
 - `--library <path>` - Path to face_detector library (auto-detected by default)
 - `--cascade <path>` - Path to Haar cascade XML file
-- `--output <path>` - Output directory for result images (defaults to input directory)
+- `--output <path>` - Output directory for result images (preserves folder structure; defaults to saving next to originals)
 - `--help` - Show help message
 
 ### Example
@@ -96,10 +96,12 @@ Managed via vcpkg:
 ```
 
 This will:
-1. Find all images in `./images` and its subdirectories
+1. Find all images in `./tests/data` and its subdirectories
 2. Detect faces in each image
-3. Create half-size copies with blurred faces in `./results`
-4. Save `result.json` in the input directory
+3. Create half-size copies with blurred faces in `./results` (preserving folder structure)
+4. Save `result.json` in the output directory
+
+Without `--output`, result images are saved next to the original images.
 
 ## Output
 

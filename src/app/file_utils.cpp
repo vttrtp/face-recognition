@@ -7,6 +7,19 @@ namespace app {
 
 namespace fs = std::filesystem;
 
+std::string findInPaths(
+    const std::string& filename,
+    const std::vector<fs::path>& search_paths) {
+    
+    for (const auto& dir : search_paths) {
+        auto path = dir / filename;
+        if (fs::exists(path)) {
+            return fs::canonical(path).string();
+        }
+    }
+    return "";
+}
+
 std::vector<fs::path> findFiles(
     const fs::path& dir,
     const std::vector<std::string>& extensions) {

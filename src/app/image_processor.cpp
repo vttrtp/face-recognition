@@ -30,7 +30,7 @@ bool ImageProcessor::isReady() const {
 
 bool ImageProcessor::createBlurredImage(const std::string& input_path,
                                          const std::string& output_path,
-                                         const std::vector<FaceRect>& faces) {
+                                         const DetectionResultData& detection) {
     cv::Mat image = cv::imread(input_path);
     if (image.empty()) {
         return false;
@@ -41,7 +41,9 @@ bool ImageProcessor::createBlurredImage(const std::string& input_path,
     cv::resize(image, resized, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
 
     // Blur face regions (scaled to half size)
-    for (const auto& face : faces) {
+    const FaceRect* faces = detection.data();
+    for (int i = 0; i < detection.count(); ++i) {
+        const auto& face = faces[i];
         // Scale face coordinates to resized image
         cv::Rect roi(
             face.x / 2,
@@ -72,37 +74,36 @@ bool ImageProcessor::createBlurredImage(const std::string& input_path,
 }
 
 ImageResult ImageProcessor::processImage(const fs::path& image_path,
-                                          const fs::path& output_dir) {
+                                          const fs::path& input_root,
+                                          const fs::path& output_root) {
     ImageResult result;
     result.original_path = image_path.string();
     result.success = false;
 
-    auto detection = m_detector.detect(image_path.string());
-    
-    // Copy faces to vector
-    std::vector<FaceRect> faces_vec = detection.toVector();
+    result.detection = m_detector.detect(image_path.string());
+
+    // Determine output directory
+    fs::path output_dir;
+    if (output_root.empty()) {
+        // No output specified: save in same directory as the image
+        output_dir = image_path.parent_path();
+    } else {
+        // Output specified: preserve relative path structure
+        fs::path relative = fs::relative(image_path.parent_path(), input_root);
+        output_dir = output_root / relative;
+    }
 
     // Generate output filename: original_name_result.jpg
     std::string stem = image_path.stem().string();
     std::string output_filename = stem + "_result.jpg";
     fs::path output_path = output_dir / output_filename;
 
-    // Handle filename collisions
-    int counter = 1;
-    while (fs::exists(output_path)) {
-        output_filename = stem + "_result_" + std::to_string(counter++) + ".jpg";
-        output_path = output_dir / output_filename;
-    }
-
     result.result_path = output_path.string();
 
-    if (!createBlurredImage(image_path.string(), output_path.string(), faces_vec)) {
+    if (!createBlurredImage(image_path.string(), output_path.string(), result.detection)) {
         result.error_message = "Failed to create output image";
         return result;
     }
-
-    // Move faces to result for JSON output
-    result.faces = std::move(faces_vec);
 
     result.success = true;
     return result;
@@ -112,20 +113,20 @@ std::vector<ImageResult> ImageProcessor::processDirectory(const std::string& inp
                                                            const std::string& output_dir) {
     std::vector<ImageResult> results;
 
-    fs::path input_path(input_dir);
-    fs::path output_path = output_dir.empty() ? input_path : fs::path(output_dir);
+    fs::path input_root(input_dir);
+    fs::path output_root = output_dir.empty() ? fs::path() : fs::path(output_dir);
 
-    if (!fs::exists(input_path) || !fs::is_directory(input_path)) {
+    if (!fs::exists(input_root) || !fs::is_directory(input_root)) {
         std::cerr << "[ImageProcessor] Invalid input directory: " << input_dir << std::endl;
         return results;
     }
 
-    auto images = findFiles(input_path, IMAGE_EXTENSIONS);
+    auto images = findFiles(input_root, IMAGE_EXTENSIONS);
     std::cout << "[ImageProcessor] Found " << images.size() << " images to process" << std::endl;
 
     results.reserve(images.size());
     for (const auto& image : images) {
-        auto result = processImage(image, output_path);
+        auto result = processImage(image, input_root, output_root);
         results.push_back(std::move(result));
     }
 
@@ -147,7 +148,9 @@ bool ImageProcessor::saveResultsToJson(const std::vector<ImageResult>& results,
         }
 
         Json::Value faces_array(Json::arrayValue);
-        for (const auto& face : result.faces) {
+        const FaceRect* faces = result.detection.data();
+        for (int i = 0; i < result.detection.count(); ++i) {
+            const auto& face = faces[i];
             Json::Value face_obj;
             face_obj["x"] = face.x;
             face_obj["y"] = face.y;
@@ -156,7 +159,7 @@ bool ImageProcessor::saveResultsToJson(const std::vector<ImageResult>& results,
             faces_array.append(face_obj);
         }
         item["faces"] = faces_array;
-        item["face_count"] = static_cast<int>(result.faces.size());
+        item["face_count"] = result.detection.count();
 
         root.append(item);
     }

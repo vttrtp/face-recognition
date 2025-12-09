@@ -1,6 +1,7 @@
 #include "library_loader.hpp"
 #include "face_detector_wrapper.hpp"
 #include "image_processor.hpp"
+#include "file_utils.hpp"
 
 #include <iostream>
 #include <filesystem>
@@ -34,42 +35,31 @@ std::string findLibrary(const fs::path& exe_dir) {
 
     // Search locations
     std::vector<fs::path> search_paths = {
-        exe_dir / lib_name,
-        exe_dir / "lib" / lib_name,
-        exe_dir / ".." / "lib" / lib_name,
-        fs::current_path() / lib_name,
-        fs::current_path() / "lib" / lib_name
+        exe_dir,
+        exe_dir / "lib",
+        exe_dir / ".."/  "lib",
+        fs::current_path(),
+        fs::current_path() / "lib"
     };
 
-    for (const auto& path : search_paths) {
-        if (fs::exists(path)) {
-            return fs::canonical(path).string();
-        }
-    }
-
-    return lib_name;  // Fall back to system library path
+    auto result = app::findInPaths(lib_name, search_paths);
+    return result.empty() ? lib_name : result;  // Fall back to system library path
 }
 
 std::string findCascade(const fs::path& exe_dir) {
     const std::string cascade_name = "haarcascade_frontalface_default.xml";
 
     std::vector<fs::path> search_paths = {
-        exe_dir / "data" / cascade_name,
-        exe_dir / cascade_name,
-        exe_dir / ".." / "data" / cascade_name,
-        fs::current_path() / "data" / cascade_name,
-        fs::current_path() / cascade_name,
-        "/usr/share/opencv4/haarcascades" / fs::path(cascade_name),
-        "/usr/local/share/opencv4/haarcascades" / fs::path(cascade_name)
+        exe_dir / "data",
+        exe_dir,
+        exe_dir / ".." / "data",
+        fs::current_path() / "data",
+        fs::current_path(),
+        "/usr/share/opencv4/haarcascades",
+        "/usr/local/share/opencv4/haarcascades"
     };
 
-    for (const auto& path : search_paths) {
-        if (fs::exists(path)) {
-            return fs::canonical(path).string();
-        }
-    }
-
-    return "";
+    return app::findInPaths(cascade_name, search_paths);
 }
 
 int main(int argc, char* argv[]) {
@@ -167,8 +157,9 @@ int main(int argc, char* argv[]) {
     // Process all images
     auto results = processor.processDirectory(input_dir, output_dir);
 
-    // Generate JSON output path
-    fs::path json_path = fs::path(input_dir) / "result.json";
+    // Generate JSON output path (save to output directory)
+    fs::path output_path = output_dir.empty() ? fs::path(input_dir) : fs::path(output_dir);
+    fs::path json_path = output_path / "result.json";
 
     // Save results to JSON
     if (!processor.saveResultsToJson(results, json_path.string())) {
@@ -182,7 +173,7 @@ int main(int argc, char* argv[]) {
     for (const auto& result : results) {
         if (result.success) {
             successful++;
-            total_faces += static_cast<int>(result.faces.size());
+            total_faces += result.detection.count();
         }
     }
 

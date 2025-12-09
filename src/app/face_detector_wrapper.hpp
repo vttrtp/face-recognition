@@ -2,7 +2,6 @@
 
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "face_detector_interface.h"
 
@@ -29,7 +28,6 @@ public:
     
     [[nodiscard]] int count() const;
     [[nodiscard]] const FaceRect* data() const;
-    [[nodiscard]] std::vector<FaceRect> toVector() const;
 
 private:
     LibraryLoader* loader_ = nullptr;

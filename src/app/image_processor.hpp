@@ -4,11 +4,9 @@
 #include <vector>
 #include <filesystem>
 
-#include "face_detector_interface.h"
+#include "face_detector_wrapper.hpp"
 
 namespace app {
-
-class FaceDetectorWrapper;
 
 /**
  * @brief Structure to hold processing result for a single image
@@ -16,7 +14,7 @@ class FaceDetectorWrapper;
 struct ImageResult {
     std::string original_path;
     std::string result_path;
-    std::vector<FaceRect> faces;
+    DetectionResultData detection;
     bool success;
     std::string error_message;
 };
@@ -64,22 +62,24 @@ private:
     /**
      * @brief Process a single image
      * @param image_path Path to input image
-     * @param output_dir Directory for output image
+     * @param input_root Root input directory (for calculating relative paths)
+     * @param output_root Root output directory (empty = save next to original)
      * @return Processing result
      */
     ImageResult processImage(const std::filesystem::path& image_path,
-                             const std::filesystem::path& output_dir);
+                             const std::filesystem::path& input_root,
+                             const std::filesystem::path& output_root);
 
     /**
      * @brief Create output image with blurred faces
      * @param input_path Path to original image
      * @param output_path Path to save result
-     * @param faces Detected face rectangles
+     * @param detection Detected face data
      * @return true on success
      */
     bool createBlurredImage(const std::string& input_path,
                             const std::string& output_path,
-                            const std::vector<FaceRect>& faces);
+                            const DetectionResultData& detection);
 
     FaceDetectorWrapper& m_detector;
 };

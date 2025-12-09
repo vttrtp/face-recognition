@@ -49,15 +49,6 @@ const FaceRect* DetectionResultData::data() const {
     return loader_->getFacesData(result_);
 }
 
-std::vector<FaceRect> DetectionResultData::toVector() const {
-    int c = count();
-    const FaceRect* ptr = data();
-    if (c <= 0 || !ptr) {
-        return {};
-    }
-    return {ptr, ptr + c};
-}
-
 // FaceDetectorWrapper implementation
 
 FaceDetectorWrapper::FaceDetectorWrapper(LibraryLoader& loader, const std::string& cascade_path)
