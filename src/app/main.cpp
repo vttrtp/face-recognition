@@ -36,14 +36,11 @@ std::string findLibrary(const fs::path& exe_dir) {
     // Search locations
     std::vector<fs::path> search_paths = {
         exe_dir,
-        exe_dir / "lib",
-        exe_dir / ".."/  "lib",
-        fs::current_path(),
-        fs::current_path() / "lib"
+        exe_dir / ".." / "lib"
     };
 
     auto result = app::findInPaths(lib_name, search_paths);
-    return result.empty() ? lib_name : result;  // Fall back to system library path
+    return result.empty() ? lib_name : result;  // Fall back to LD_LIBRARY_PATH
 }
 
 std::string findCascade(const fs::path& exe_dir) {
@@ -51,12 +48,7 @@ std::string findCascade(const fs::path& exe_dir) {
 
     std::vector<fs::path> search_paths = {
         exe_dir / "data",
-        exe_dir,
-        exe_dir / ".." / "data",
-        fs::current_path() / "data",
-        fs::current_path(),
-        "/usr/share/opencv4/haarcascades",
-        "/usr/local/share/opencv4/haarcascades"
+        exe_dir / ".." / "share" / "face_detector"
     };
 
     return app::findInPaths(cascade_name, search_paths);

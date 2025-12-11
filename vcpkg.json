@@ -6,7 +6,13 @@
     {
       "name": "opencv4",
       "default-features": false,
-      "features": ["jpeg", "png", "calib3d"]
+      "features": ["calib3d"]
+    },
+    {
+      "name": "opencv4",
+      "default-features": false,
+      "features": ["jpeg", "png"],
+      "platform": "!emscripten"
     },
     {
       "name": "gtest",

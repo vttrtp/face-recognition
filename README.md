@@ -178,6 +178,7 @@ face-recognition/
 ├── CMakeLists.txt          # Root CMake configuration
 ├── CMakePresets.json       # CMake presets for vcpkg
 ├── vcpkg.json              # vcpkg dependencies manifest
+├── cmake/                  # CMake helper modules
 ├── triplets/               # Custom vcpkg triplets
 ├── src/
 │   ├── facedetector/       # Face detector library

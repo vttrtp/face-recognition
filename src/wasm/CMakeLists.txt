@@ -48,17 +48,12 @@ if(EMSCRIPTEN)
         COPYONLY
     )
     
-    # Download cascade file if not present
-    set(CASCADE_FILE_NAME "haarcascade_frontalface_default.xml")
-    set(CASCADE_DEST "${CMAKE_BINARY_DIR}/web/${CASCADE_FILE_NAME}")
-    if(NOT EXISTS ${CASCADE_DEST})
-        set(CASCADE_URL "https://raw.githubusercontent.com/opencv/opencv/4.x/data/haarcascades/${CASCADE_FILE_NAME}")
-        message(STATUS "Downloading cascade file for web demo...")
-        file(DOWNLOAD ${CASCADE_URL} ${CASCADE_DEST}
-            STATUS DOWNLOAD_STATUS
-            SHOW_PROGRESS
-        )
-    endif()
+    # Copy cascade file from build/data (downloaded by facedetector)
+    configure_file(
+        ${CMAKE_BINARY_DIR}/data/haarcascade_frontalface_default.xml
+        ${CMAKE_BINARY_DIR}/web/haarcascade_frontalface_default.xml
+        COPYONLY
+    )
     
     # Copy output files to web directory after build
     add_custom_command(TARGET ${WASM_TARGET} POST_BUILD

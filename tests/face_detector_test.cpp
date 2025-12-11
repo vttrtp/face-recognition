@@ -39,10 +39,7 @@ protected:
         fs::path exe_dir = exe_path.parent_path();
         
         std::vector<fs::path> search_paths = {
-            exe_dir / "data/haarcascade_frontalface_default.xml",
-            "data/haarcascade_frontalface_default.xml",
-            "../data/haarcascade_frontalface_default.xml",
-            "build/data/haarcascade_frontalface_default.xml"
+            exe_dir / "data" / "haarcascade_frontalface_default.xml"
         };
 
         for (const auto& path : search_paths) {
@@ -58,10 +55,7 @@ protected:
         fs::path exe_dir = exe_path.parent_path();
         
         std::vector<fs::path> search_paths = {
-            exe_dir / "data/test_image.jpg",
-            "data/test_image.jpg",
-            "../data/test_image.jpg",
-            "tests/data/test_image.jpg"
+            exe_dir / "data" / "test_image.jpg"
         };
 
         for (const auto& path : search_paths) {
