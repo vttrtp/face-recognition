@@ -19,15 +19,6 @@ target_link_libraries(${TEST_NAME}
 include(GoogleTest)
 gtest_discover_tests(${TEST_NAME})
 
-# Copy test data
+# Copy test data and cascade files
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
-# Copy cascade file for tests (only if exists)
-if(EXISTS "${CMAKE_BINARY_DIR}/data")
-    add_custom_command(TARGET ${TEST_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_BINARY_DIR}/data"
-            "$<TARGET_FILE_DIR:${TEST_NAME}>/data"
-        COMMENT "Copying data files for tests"
-    )
-endif()
+copy_data_to_target(${TEST_NAME})

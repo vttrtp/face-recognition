@@ -22,31 +22,9 @@ target_link_libraries(${APP_NAME}
         ${CMAKE_DL_LIBS}
 )
 
-# Copy cascade file next to executable (only if found)
-if(EXISTS "${CMAKE_BINARY_DIR}/data")
-    add_custom_command(TARGET ${APP_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>/data"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_BINARY_DIR}/data"
-            "$<TARGET_FILE_DIR:${APP_NAME}>/data"
-        COMMENT "Copying data files to output directory"
-    )
-endif()
-
-# Copy the library next to executable - re-runs when library changes
-add_custom_command(
-    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/libface_detector_copied"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE:face_detector>"
-        "$<TARGET_FILE_DIR:${APP_NAME}>"
-    COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/libface_detector_copied"
-    DEPENDS face_detector
-    COMMENT "Copying face_detector library to output directory"
-)
-
-add_custom_target(copy_face_detector_lib ALL
-    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libface_detector_copied"
-)
+# Copy data and library to output directory
+copy_data_to_target(${APP_NAME})
+copy_library_to_target(${APP_NAME} face_detector)
 
 add_dependencies(${APP_NAME} face_detector)
 
