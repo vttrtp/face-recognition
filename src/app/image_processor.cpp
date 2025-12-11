@@ -20,12 +20,12 @@ static const std::vector<std::string> IMAGE_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"
 };
 
-ImageProcessor::ImageProcessor(FaceDetectorWrapper& detector)
+ImageProcessor::ImageProcessor(const std::shared_ptr<FaceDetectorWrapper>& detector)
     : m_detector(detector) {
 }
 
 bool ImageProcessor::isReady() const {
-    return m_detector.isReady();
+    return m_detector && m_detector->isReady();
 }
 
 bool ImageProcessor::createBlurredImage(const std::string& input_path,
@@ -80,7 +80,7 @@ ImageResult ImageProcessor::processImage(const fs::path& image_path,
     result.original_path = image_path.string();
     result.success = false;
 
-    result.detection = m_detector.detect(image_path.string());
+    result.detection = m_detector->detect(image_path.string());
 
     // Determine output directory
     fs::path output_dir;

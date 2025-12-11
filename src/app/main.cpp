@@ -140,8 +140,8 @@ int main(int argc, char* argv[]) {
     }
 
     // Create face detector wrapper
-    app::FaceDetectorWrapper detector(cascade_path);
-    if (!detector.isReady()) {
+    auto detector = std::make_shared<app::FaceDetectorWrapper>(cascade_path);
+    if (!detector->isReady()) {
         std::cerr << "Error: failed to initialize face detector" << std::endl;
         return 1;
     }

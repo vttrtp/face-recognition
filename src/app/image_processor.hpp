@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <filesystem>
+#include <memory>
 
 #include "face_detector_wrapper.hpp"
 
@@ -29,9 +30,9 @@ class ImageProcessor {
 public:
     /**
      * @brief Construct processor with face detector wrapper
-     * @param detector Reference to face detector wrapper (must outlive this processor)
+     * @param detector Shared pointer to face detector wrapper
      */
-    explicit ImageProcessor(FaceDetectorWrapper& detector);
+    explicit ImageProcessor(const std::shared_ptr<FaceDetectorWrapper>& detector);
     
     ~ImageProcessor() = default;
 
@@ -81,7 +82,7 @@ private:
                             const std::string& output_path,
                             const DetectionResultData& detection);
 
-    FaceDetectorWrapper& m_detector;
+    std::shared_ptr<FaceDetectorWrapper> m_detector;
 };
 
 } // namespace app
