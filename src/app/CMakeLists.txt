@@ -3,6 +3,7 @@ set(APP_NAME face_recognition_app)
 add_executable(${APP_NAME}
     main.cpp
     image_processor.cpp
+    library_loader.cpp
     face_detector_library.cpp
     face_detector_wrapper.cpp
     file_utils.cpp
