@@ -50,3 +50,4 @@ __pycache__/
 samples/java/src/main/java/face/detector/
 samples/java/out/
 !samples/java/src/main/java/face/detector/FaceDetectorDemo.java
+*.class

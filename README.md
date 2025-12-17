@@ -69,24 +69,43 @@ Managed via vcpkg:
 
 ## Building
 
-1. Make sure vcpkg is installed at `../vcpkg` relative to this project (or set `VCPKG_ROOT` environment variable).
+### Using CMake Presets
 
-2. Configure and build (dependencies are installed automatically via vcpkg manifest mode):
-   ```bash
-   cmake --preset default
-   cmake --build --preset default
-   ```
+The project uses CMake presets for easy building. Make sure vcpkg is installed at `../vcpkg` relative to this project.
 
-   For debug build:
-   ```bash
-   cmake --preset debug
-   cmake --build --preset debug
-   ```
+**Available presets:**
+| Preset | Description | Build Directory |
+|--------|-------------|-----------------|
+| `default` | Release build with vcpkg | `build/` |
+| `debug` | Debug build with vcpkg | `build-debug/` |
+| `wasm` | WASM build with Emscripten + vcpkg | `build-wasm/` |
+| `idl-wasm` | IDL samples WASM build (no vcpkg) | `build-wasm-idl/` |
+
+**Native build:**
+```bash
+cmake --preset default
+cmake --build --preset default
+```
+
+**Debug build:**
+```bash
+cmake --preset debug
+cmake --build --preset debug
+```
+
+### Build All & Run Tests
+
+A convenience script is provided to build all targets and run all tests:
+
+```bash
+.vscode/build_all.sh          # Build all and run tests
+.vscode/build_all.sh --clean  # Clean build
+```
 
 ## Usage
 
 ```bash
-./build/app/face_recognition_app <input_directory> [options]
+./build/src/app/face_recognition_app <input_directory> [options]
 ```
 
 ### Options
@@ -137,12 +156,14 @@ For each processed image, a `*_result.jpg` file is created with:
 
 ## Running Tests
 
+Run all tests using the test preset:
+
 ```bash
-cd build
-ctest --output-on-failure
+ctest --preset default
 ```
 
 Or run the test executable directly:
+
 ```bash
 ./build/tests/face_detector_test
 ```
@@ -183,29 +204,40 @@ The demo allows you to:
 ```
 face-recognition/
 ├── CMakeLists.txt              # Root CMake configuration
-├── CMakePresets.json           # CMake presets for vcpkg
+├── CMakePresets.json           # CMake presets (default, debug, wasm, idl-wasm)
 ├── vcpkg.json                  # vcpkg dependencies manifest
 ├── cmake/                      # CMake helper modules
-├── triplets/                   # Custom vcpkg triplets
-├── tools/
-│   ├── generate_bindings.py    # Main code generator script
-│   └── idlgen/                 # Code generator package
-│       ├── parser.py           # IDL parser (C++-like syntax)
-│       ├── type_mapper.py      # Type mapping utilities
-│       ├── c_api_generator.py  # C API generator
-│       ├── client_generator.py # C++ client wrapper generator
-│       ├── wasm_generator.py   # Emscripten bindings generator
-│       └── jni_generator.py    # Java JNI bindings generator
+├── triplets/                   # Custom vcpkg triplets (wasm32-emscripten)
+├── idlgen/                     # IDL Code Generator (extractable module)
+│   ├── pyproject.toml          # Python package configuration
+│   ├── bin/generate_bindings.py # CLI entry point
+│   ├── idlgen/                 # Python package
+│   │   ├── parser.py           # IDL parser (C++-like syntax)
+│   │   ├── type_mapper.py      # Type mapping utilities
+│   │   ├── c_api_generator.py  # C API generator
+│   │   ├── client_generator.py # C++ client wrapper generator
+│   │   ├── wasm_generator.py   # Emscripten bindings generator
+│   │   └── jni_generator.py    # Java JNI bindings generator
+│   └── samples/                # IDL test samples
+│       ├── samples.idl         # Sample IDL definitions
+│       ├── samples.hpp         # Sample C++ implementation
+│       ├── CMakeLists.txt      # Build configuration
+│       └── tests/              # Per-language test folders
+│           ├── cpp/            # C++ tests + generated/
+│           ├── java/           # Java tests + generated/
+│           └── wasm/           # WASM tests + generated/
 ├── src/
 │   ├── facedetector/           # Face detector library implementation
 │   │   └── face_detector.idl   # IDL interface definition
 │   ├── generated/              # Auto-generated bindings (C API, WASM, JNI)
 │   ├── app/                    # Console application
-│   ├── wasm/                   # WebAssembly module
-│   └── web/                    # Web demo HTML
-├── samples/
+│   ├── wasm/                   # WebAssembly module build config
+│   ├── web/                    # Web demo HTML/CSS/JS
 │   └── java/                   # Java JNI sample application
-└── tests/                      # Unit tests
+├── tests/                      # Unit tests (face detector)
+├── data/                       # Haar cascade XML files
+└── .vscode/                    # VS Code configuration
+    └── build_all.sh            # Build and test all targets
 ```
 
 ## Code Generation
@@ -216,33 +248,20 @@ The project uses a custom IDL (Interface Definition Language) to automatically g
 - **WASM Bindings** - Emscripten JavaScript interop
 - **Java JNI** - Native bindings for Java applications
 
-### IDL Syntax (C++-like)
-
-```cpp
-struct FaceRect {
-    int x;
-    int y;
-    int width;
-    int height;
-};
-
-interface FaceDetector {
-    constructor(const string& cascadePath);
-    bool isLoaded() const;
-    vector<FaceRect> detectFromFile(const string& imagePath);
-};
-```
-
 ### Generate Bindings
 
 ```bash
-python tools/generate_bindings.py src/facedetector/face_detector.idl \
+python idlgen/bin/generate_bindings.py src/facedetector/face_detector.idl \
     --namespace face_detector \
     --output-dir src/generated \
-    --java --java-output-dir samples/java/src/main/java
+    --java --java-output-dir src/java/src/main/java
 ```
 
 Bindings are auto-regenerated during CMake build when the IDL file changes.
+
+### IDL Generator Module
+
+The `idlgen/` directory is designed as an extractable Python module. See [idlgen/README.md](idlgen/README.md) for details.
 
 ## License
 

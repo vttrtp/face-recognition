@@ -17,6 +17,18 @@
       }
     },
     {
+      "name": "wasm-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "environment": {
+        "EMSDK": "${sourceDir}/../emsdk"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+      }
+    },
+    {
       "name": "default",
       "inherits": "base",
       "binaryDir": "${sourceDir}/build"
@@ -43,6 +55,16 @@
         "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
         "BUILD_TESTS": "OFF"
       }
+    },
+    {
+      "name": "idl-wasm",
+      "inherits": "wasm-base",
+      "binaryDir": "${sourceDir}/build-wasm-idl",
+      "cacheVariables": {
+        "BUILD_IDL_SAMPLES": "ON",
+        "BUILD_IDL_SAMPLES_ONLY": "ON",
+        "BUILD_TESTS": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -57,6 +79,19 @@
     {
       "name": "wasm",
       "configurePreset": "wasm"
+    },
+    {
+      "name": "idl-wasm",
+      "configurePreset": "idl-wasm"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

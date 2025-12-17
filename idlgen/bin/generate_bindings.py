@@ -14,8 +14,12 @@ Usage:
 """
 
 import argparse
+import sys
 import time
 from pathlib import Path
+
+# Add parent directory to path so idlgen package can be found
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from idlgen import (
     IDLParser,

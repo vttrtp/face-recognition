@@ -49,52 +49,6 @@ java -Djava.library.path=../../build/lib \
      /path/to/test/image.jpg
 ```
 
-## Example Output
-
-```
-Face Detection Demo
-==================
-Cascade: ../../build/data/haarcascade_frontalface_default.xml
-Image: test.jpg
-
-Detector loaded successfully!
-Detected 2 face(s):
-  Face 1: x=120, y=85, width=150, height=150
-  Face 2: x=320, y=95, width=140, height=140
-```
-
-## API Reference
-
-### FaceDetector
-
-```java
-// Constructor - loads cascade classifier
-FaceDetector(String cascadePath)
-
-// Check if detector is loaded
-boolean isLoaded()
-
-// Detect faces in image file
-List<FaceRect> detectFromFile(String imagePath)
-
-// Detect faces in raw image data
-List<FaceRect> detectFromImageData(byte[] data, int width, int height)
-
-// Clean up native resources
-void close()
-```
-
-### FaceRect
-
-```java
-class FaceRect {
-    public int x;       // X coordinate of top-left corner
-    public int y;       // Y coordinate of top-left corner
-    public int width;   // Width of face rectangle
-    public int height;  // Height of face rectangle
-}
-```
-
 ## Notes
 
 - Always use try-with-resources or call `close()` to release native resources
