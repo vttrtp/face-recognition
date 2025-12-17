@@ -33,6 +33,20 @@ A cross-platform C++ application for detecting faces in images. The project cons
 - vcpkg package manager
 - Emscripten SDK (for WASM build)
 
+## Cloning the Repository
+
+This project uses git submodules for the IDL code generator. Clone with:
+
+```bash
+git clone --recurse-submodules git@github.com:vttrtp/face-recognition.git
+```
+
+Or if you already cloned without submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
 ## Installing Prerequisites
 
 ### vcpkg
@@ -79,7 +93,6 @@ The project uses CMake presets for easy building. Make sure vcpkg is installed a
 | `default` | Release build with vcpkg | `build/` |
 | `debug` | Debug build with vcpkg | `build-debug/` |
 | `wasm` | WASM build with Emscripten + vcpkg | `build-wasm/` |
-| `idl-wasm` | IDL samples WASM build (no vcpkg) | `build-wasm-idl/` |
 
 **Native build:**
 ```bash
@@ -208,24 +221,7 @@ face-recognition/
 ├── vcpkg.json                  # vcpkg dependencies manifest
 ├── cmake/                      # CMake helper modules
 ├── triplets/                   # Custom vcpkg triplets (wasm32-emscripten)
-├── idlgen/                     # IDL Code Generator (extractable module)
-│   ├── pyproject.toml          # Python package configuration
-│   ├── bin/generate_bindings.py # CLI entry point
-│   ├── idlgen/                 # Python package
-│   │   ├── parser.py           # IDL parser (C++-like syntax)
-│   │   ├── type_mapper.py      # Type mapping utilities
-│   │   ├── c_api_generator.py  # C API generator
-│   │   ├── client_generator.py # C++ client wrapper generator
-│   │   ├── wasm_generator.py   # Emscripten bindings generator
-│   │   └── jni_generator.py    # Java JNI bindings generator
-│   └── samples/                # IDL test samples
-│       ├── samples.idl         # Sample IDL definitions
-│       ├── samples.hpp         # Sample C++ implementation
-│       ├── CMakeLists.txt      # Build configuration
-│       └── tests/              # Per-language test folders
-│           ├── cpp/            # C++ tests + generated/
-│           ├── java/           # Java tests + generated/
-│           └── wasm/           # WASM tests + generated/
+├── idlgen/                     # IDL code generator submodule
 ├── src/
 │   ├── facedetector/           # Face detector library implementation
 │   │   └── face_detector.idl   # IDL interface definition
@@ -258,10 +254,6 @@ python idlgen/bin/generate_bindings.py src/facedetector/face_detector.idl \
 ```
 
 Bindings are auto-regenerated during CMake build when the IDL file changes.
-
-### IDL Generator Module
-
-The `idlgen/` directory is designed as an extractable Python module. See [idlgen/README.md](idlgen/README.md) for details.
 
 ## License
 

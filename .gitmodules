@@ -1,0 +1,3 @@
+[submodule "idlgen"]
+	path = idlgen
+	url = git@github.com:vttrtp/idlgen.git

@@ -18,8 +18,6 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # Options
 option(BUILD_TESTS "Build unit tests" ON)
-option(BUILD_IDL_SAMPLES "Build IDL generator samples" ON)
-option(BUILD_IDL_SAMPLES_ONLY "Build only IDL samples (skip face-recognition)" OFF)
 
 # Set visibility for shared libraries (not applicable for WASM)
 if(NOT EMSCRIPTEN)
@@ -29,42 +27,33 @@ endif()
 
 # Find required packages
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs objdetect)
+find_package(jsoncpp CONFIG REQUIRED)
 
-# Face-recognition components (skip if only building IDL samples)
-if(NOT BUILD_IDL_SAMPLES_ONLY)
-    find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs objdetect)
-    find_package(jsoncpp CONFIG REQUIRED)
+# Generated bindings (must come before facedetector)
+add_subdirectory(src/generated)
 
-    # Generated bindings (must come before facedetector)
-    add_subdirectory(src/generated)
+# Subdirectories
+add_subdirectory(src/facedetector)
 
-    # Subdirectories
-    add_subdirectory(src/facedetector)
-
-    # WASM bindings
-    if(EMSCRIPTEN)
-        add_subdirectory(src/wasm)
-    endif()
-
-    # App uses dlopen which is not available in WASM
-    if(NOT EMSCRIPTEN)
-        add_subdirectory(src/app)
-    endif()
-
-    # Java JNI bindings (optional)
-    if(NOT EMSCRIPTEN)
-        include(JavaJNI)
-    endif()
-
-    # Tests
-    if(BUILD_TESTS AND NOT EMSCRIPTEN)
-        find_package(GTest CONFIG REQUIRED)
-        enable_testing()
-        add_subdirectory(tests)
-    endif()
+# WASM bindings
+if(EMSCRIPTEN)
+    add_subdirectory(src/wasm)
 endif()
 
-# IDL Generator Samples
-if(BUILD_IDL_SAMPLES)
-    add_subdirectory(idlgen/samples)
+# App uses dlopen which is not available in WASM
+if(NOT EMSCRIPTEN)
+    add_subdirectory(src/app)
+endif()
+
+# Java JNI bindings (optional)
+if(NOT EMSCRIPTEN)
+    include(JavaJNI)
+endif()
+
+# Tests
+if(BUILD_TESTS AND NOT EMSCRIPTEN)
+    find_package(GTest CONFIG REQUIRED)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
