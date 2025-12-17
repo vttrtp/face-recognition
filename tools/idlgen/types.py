@@ -32,6 +32,14 @@ class Method:
 
 
 @dataclass
+class Callback:
+    """Callback function type definition"""
+    name: str
+    return_type: str
+    params: list[Param] = field(default_factory=list)
+
+
+@dataclass
 class Interface:
     """IDL interface definition"""
     name: str
@@ -51,3 +59,4 @@ class ParsedIDL:
     """Complete parsed IDL result"""
     structs: list[Struct] = field(default_factory=list)
     interfaces: list[Interface] = field(default_factory=list)
+    callbacks: list[Callback] = field(default_factory=list)

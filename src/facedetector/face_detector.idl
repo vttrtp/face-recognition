@@ -3,6 +3,7 @@
 //   - C API exports for shared library
 //   - C++ import wrapper for dynamic loading  
 //   - Emscripten bindings for WASM
+//   - JNI bindings for Java
 
 struct FaceRect {
     int x;

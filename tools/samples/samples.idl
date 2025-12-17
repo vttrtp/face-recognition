@@ -1,0 +1,95 @@
+// IDL Samples for testing code generation
+// This file demonstrates all IDL features:
+//   - Structs with various field types
+//   - Interfaces with different parameter/return types
+//   - Callbacks with different signatures
+//   - Vector returns, struct parameters, etc.
+
+// Simple 2D point
+struct Point {
+    int x;
+    int y;
+};
+
+// Bounding box with confidence
+struct BoundingBox {
+    int x;
+    int y;
+    int width;
+    int height;
+    double confidence;
+};
+
+// Calculator class for testing numeric types
+interface Calculator {
+    Calculator();
+
+    // Basic arithmetic - tests various return types
+    int add(int a, int b);
+    int subtract(int a, int b);
+    int multiply(int a, int b);
+    double divide(double a, double b);
+
+    // Accumulator functions - tests void return and state
+    int getTotal() const;
+
+    // Get version - tests int return
+    int getVersionMajor() const;
+    int getVersionMinor() const;
+};
+
+// Geometry helper for testing vector return with different struct types
+interface Geometry {
+    Geometry();
+
+    // Create a sequence of points - returns vector<Point>
+    vector<Point> createLine(int x1, int y1, int x2, int y2, int numPoints);
+
+    // Find bounding boxes - returns vector<BoundingBox> (different type!)
+    vector<BoundingBox> findBoundingBoxes(int count);
+
+    // Get count of last operation
+    int getLastCount() const;
+};
+
+// Shape processor for testing struct parameters by value and reference
+interface ShapeProcessor {
+    ShapeProcessor();
+
+    // Test receiving struct by value
+    int calculateArea(BoundingBox box);
+
+    // Test receiving struct by const reference
+    double calculateDiagonal(const BoundingBox& box);
+
+    // Test receiving Point by value and returning Point
+    Point translate(Point p, int dx, int dy);
+
+    // Test receiving Point by const reference
+    int distanceFromOrigin(const Point& p);
+
+    // Test receiving multiple struct parameters
+    bool boxContainsPoint(const BoundingBox& box, const Point& point);
+
+    // Test returning struct
+    BoundingBox createBox(int x, int y, int width, int height);
+};
+
+// Callback types for async operations
+callback ProgressCallback(int current, int total) -> void;
+callback FilterCallback(int value) -> bool;
+callback TransformCallback(int value) -> int;
+
+// Async processor for testing callback support
+interface AsyncProcessor {
+    AsyncProcessor();
+
+    // Process with progress reporting - tests void callback
+    int processWithProgress(int count, ProgressCallback onProgress);
+
+    // Filter values using callback - tests bool callback
+    int countFiltered(int start, int end, FilterCallback filter);
+
+    // Transform values using callback - tests int callback
+    int sumTransformed(int start, int end, TransformCallback transform);
+};

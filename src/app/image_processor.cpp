@@ -30,7 +30,7 @@ bool ImageProcessor::isReady() const {
 
 bool ImageProcessor::createBlurredImage(const std::string& input_path,
                                          const std::string& output_path,
-                                         const face_detector_client::DetectionResult& detection) {
+                                         const face_detector_client::FaceDetectorFaceRectResult& detection) {
     cv::Mat image = cv::imread(input_path);
     if (image.empty()) {
         return false;

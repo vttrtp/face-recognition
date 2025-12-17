@@ -47,5 +47,6 @@ __pycache__/
 *.pyc
 
 # Generated Java files
-samples/java/src/main/java/face/detector/FaceDetector.java
+samples/java/src/main/java/face/detector/
 samples/java/out/
+!samples/java/src/main/java/face/detector/FaceDetectorDemo.java

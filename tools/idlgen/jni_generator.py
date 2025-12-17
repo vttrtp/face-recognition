@@ -84,6 +84,24 @@ class JNIGenerator:
 
         return "\n".join(lines)
 
+    def generate_java_types(self) -> str:
+        """Generate shared Java types file (structs and callbacks)"""
+        lines = [
+            "// AUTO-GENERATED - DO NOT EDIT",
+            f"package {self.java_package};",
+            "",
+        ]
+
+        # Generate callback functional interfaces
+        for cb in self.idl.callbacks:
+            lines.extend(self._java_callback_interface(cb))
+
+        # Generate struct classes
+        for struct in self.idl.structs:
+            lines.extend(self._java_struct_class(struct))
+
+        return "\n".join(lines)
+
     def generate_java_class(self, iface: Interface) -> str:
         """Generate Java class for an interface"""
         class_name = iface.name
@@ -96,17 +114,13 @@ class JNIGenerator:
             "",
         ]
 
-        # Generate struct classes first
-        for struct in self.idl.structs:
-            lines.extend(self._java_struct_class(struct))
-
-        # Main class
+        # Main class (no longer include shared types - they go in Types.java)
         lines.extend([
             f"public class {class_name} implements AutoCloseable {{",
             "",
-            "    static {",
+            "    static {{",
             f'        System.loadLibrary("{self.namespace}_jni");',
-            "    }",
+            "    }}",
             "",
             "    private long nativeHandle;",
             "",
@@ -164,6 +178,20 @@ class JNIGenerator:
 
         return "\n".join(lines)
 
+    def _java_callback_interface(self, cb) -> list[str]:
+        """Generate Java functional interface for a callback"""
+        params = ", ".join(f"{self._idl_to_java_type(p.type)} {p.name}" for p in cb.params)
+        ret_type = self._idl_to_java_type(cb.return_type)
+        
+        lines = [
+            "@FunctionalInterface",
+            f"interface {cb.name} {{",
+            f"    {ret_type} invoke({params});",
+            "}",
+            "",
+        ]
+        return lines
+
     def _java_struct_class(self, struct) -> list[str]:
         """Generate Java class for a struct"""
         lines = [
@@ -187,6 +215,10 @@ class JNIGenerator:
             "",
         ])
         return lines
+
+    def _is_callback_type(self, type_name: str) -> bool:
+        """Check if type is a callback"""
+        return any(cb.name == type_name for cb in self.idl.callbacks)
 
     def _java_method(self, iface: Interface, method: Method) -> list[str]:
         """Generate Java public method"""
@@ -281,6 +313,77 @@ class JNIGenerator:
 
         return lines
 
+    def _is_struct_type(self, type_name: str) -> bool:
+        """Check if a type is a struct defined in IDL"""
+        return any(s.name == type_name for s in self.idl.structs)
+
+    def _get_struct(self, type_name: str):
+        """Get struct definition by name"""
+        return next((s for s in self.idl.structs if s.name == type_name), None)
+
+    def _get_callback(self, type_name: str):
+        """Get callback definition by name"""
+        return next((cb for cb in self.idl.callbacks if cb.name == type_name), None)
+
+    def _generate_jni_callback_wrapper(self, param: Param, cb) -> list[str]:
+        """Generate JNI code to wrap a Java callback into a C++ callback"""
+        lines = []
+        
+        # Store the JNI env and callback object for use in the wrapper
+        lines.append(f"    // Create wrapper for Java callback {param.name}")
+        lines.append(f"    jobject g_{param.name} = env->NewGlobalRef({param.name});")
+        lines.append(f"    jclass {param.name}Class = env->GetObjectClass({param.name});")
+        
+        # Build method signature
+        jni_sig = self._build_callback_signature(cb)
+        lines.append(f'    jmethodID {param.name}Method = env->GetMethodID({param.name}Class, "invoke", "{jni_sig}");')
+        
+        # Generate the C callback wrapper
+        c_params = ", ".join(f"{TypeMapper.to_c(p.type)} {p.name}" for p in cb.params)
+        c_ret = TypeMapper.to_c(cb.return_type)
+        
+        # Create a capturing lambda that calls the Java method
+        # Note: For simplicity, we use a static variable approach
+        lines.append(f"    static thread_local JNIEnv* s_env_{param.name} = nullptr;")
+        lines.append(f"    static thread_local jobject s_callback_{param.name} = nullptr;")
+        lines.append(f"    static thread_local jmethodID s_method_{param.name} = nullptr;")
+        lines.append(f"    s_env_{param.name} = env;")
+        lines.append(f"    s_callback_{param.name} = g_{param.name};")
+        lines.append(f"    s_method_{param.name} = {param.name}Method;")
+        
+        # Create the wrapper lambda
+        lines.append(f"    auto cpp_{param.name} = []({c_params}) -> {c_ret} {{")
+        
+        # Call the Java method
+        call_args = ", ".join(p.name for p in cb.params)
+        jni_call_method = self._get_jni_call_method(cb.return_type)
+        
+        if cb.return_type == 'void':
+            lines.append(f"        s_env_{param.name}->{jni_call_method}(s_callback_{param.name}, s_method_{param.name}, {call_args});")
+        else:
+            lines.append(f"        return s_env_{param.name}->{jni_call_method}(s_callback_{param.name}, s_method_{param.name}, {call_args});")
+        
+        lines.append("    };")
+        
+        return lines
+
+    def _build_callback_signature(self, cb) -> str:
+        """Build JNI method signature for callback"""
+        param_sigs = "".join(self._java_type_signature(p.type) for p in cb.params)
+        ret_sig = self._java_type_signature(cb.return_type) if cb.return_type != 'void' else 'V'
+        return f"({param_sigs}){ret_sig}"
+
+    def _get_jni_call_method(self, return_type: str) -> str:
+        """Get the JNI CallXxxMethod name for return type"""
+        mapping = {
+            'void': 'CallVoidMethod',
+            'int': 'CallIntMethod',
+            'bool': 'CallBooleanMethod',
+            'float': 'CallFloatMethod',
+            'double': 'CallDoubleMethod',
+        }
+        return mapping.get(return_type, 'CallIntMethod')
+
     def _jni_method_impl(self, iface: Interface, method: Method, jni_class: str, cpp_class: str) -> list[str]:
         """Generate single JNI method implementation"""
         ret = self._return_to_jni_type(method.return_type)
@@ -295,7 +398,8 @@ class JNIGenerator:
         lines.append(f"    auto* obj = jlongToPtr<{cpp_class}>(handle);")
         lines.append("    if (!obj) {")
         
-        if TypeMapper.is_vector(method.return_type):
+        # Determine null return value
+        if TypeMapper.is_vector(method.return_type) or self._is_struct_type(method.return_type):
             lines.append("        return nullptr;")
         elif method.return_type == "bool":
             lines.append("        return JNI_FALSE;")
@@ -314,6 +418,25 @@ class JNIGenerator:
                 # Convert jbyteArray to uint8_t*
                 lines.append(f"    jbyte* cpp_{p.name}_ptr = env->GetByteArrayElements({p.name}, nullptr);")
                 lines.append(f"    const uint8_t* cpp_{p.name} = reinterpret_cast<const uint8_t*>(cpp_{p.name}_ptr);")
+                cpp_arg_names.append(f"cpp_{p.name}")
+            elif self._is_callback_type(p.type):
+                # Convert Java callback to C++ callback wrapper
+                cb = self._get_callback(p.type)
+                lines.extend(self._generate_jni_callback_wrapper(p, cb))
+                cpp_arg_names.append(f"cpp_{p.name}")
+            elif self._is_struct_type(p.type):
+                # Convert Java object to C++ struct
+                # Structs are defined at global scope in C API header (not in namespace)
+                struct = self._get_struct(p.type)
+                java_class_path = self.java_package.replace(".", "/") + "/" + p.type
+                lines.append(f'    jclass {p.name}Class = env->GetObjectClass({p.name});')
+                lines.append(f"    ::{p.type} cpp_{p.name};")  # Use global scope
+                for m in struct.members:
+                    field_id = f"{p.name}_{m.name}_fid"
+                    jni_sig = self._java_type_signature(m.type)
+                    getter = self._jni_field_getter(m.type)
+                    lines.append(f'    jfieldID {field_id} = env->GetFieldID({p.name}Class, "{m.name}", "{jni_sig}");')
+                    lines.append(f"    cpp_{p.name}.{m.name} = env->{getter}({p.name}, {field_id});")
                 cpp_arg_names.append(f"cpp_{p.name}")
             else:
                 cpp_arg_names.append(p.name)
@@ -358,6 +481,27 @@ class JNIGenerator:
                 lines.append("    }")
             
             lines.append("    return list;")
+        elif self._is_struct_type(method.return_type):
+            # Return struct - convert C++ struct to Java object
+            struct = self._get_struct(method.return_type)
+            lines.append(f"    auto ret = obj->{method.name}({cpp_args});")
+            # Release byte arrays
+            for p in method.params:
+                if p.type == "uint8_t" and p.is_pointer:
+                    lines.append(f"    env->ReleaseByteArrayElements({p.name}, cpp_{p.name}_ptr, JNI_ABORT);")
+            
+            java_class_path = self.java_package.replace(".", "/") + "/" + method.return_type
+            lines.append(f'    jclass retClass = env->FindClass("{java_class_path}");')
+            
+            # Build constructor signature
+            sig_parts = []
+            for m in struct.members:
+                sig_parts.append(self._java_type_signature(m.type))
+            sig = "(" + "".join(sig_parts) + ")V"
+            
+            lines.append(f'    jmethodID retCtor = env->GetMethodID(retClass, "<init>", "{sig}");')
+            ctor_args = ", ".join(f"ret.{m.name}" for m in struct.members)
+            lines.append(f"    return env->NewObject(retClass, retCtor, {ctor_args});")
         elif method.return_type == "bool":
             lines.append(f"    auto ret = obj->{method.name}({cpp_args});")
             # Release byte arrays
@@ -391,6 +535,9 @@ class JNIGenerator:
 
     def _param_to_java(self, param: Param) -> str:
         """Convert param to Java declaration"""
+        # Callbacks use their interface type
+        if self._is_callback_type(param.type):
+            return f"{param.type} {param.name}"
         java_type = self._idl_to_java_type(param.type)
         if param.is_pointer and param.type == "uint8_t":
             java_type = "byte[]"
@@ -404,8 +551,18 @@ class JNIGenerator:
             return "jint"
         if param.type == "bool":
             return "jboolean"
+        if param.type == "double":
+            return "jdouble"
+        if param.type == "float":
+            return "jfloat"
         if param.is_pointer and param.type == "uint8_t":
             return "jbyteArray"
+        # Check if it's a callback type
+        if self._is_callback_type(param.type):
+            return "jobject"
+        # Check if it's a struct type
+        if any(s.name == param.type for s in self.idl.structs):
+            return "jobject"
         return "jint"
 
     def _idl_to_java_type(self, idl_type: str) -> str:
@@ -435,6 +592,13 @@ class JNIGenerator:
             return "jboolean"
         if idl_type == "string":
             return "jstring"
+        if idl_type == "double":
+            return "jdouble"
+        if idl_type == "float":
+            return "jfloat"
+        # Check if it's a struct type
+        if any(s.name == idl_type for s in self.idl.structs):
+            return "jobject"
         return "jint"
 
     def _java_type_signature(self, idl_type: str) -> str:
@@ -447,3 +611,13 @@ class JNIGenerator:
             "string": "Ljava/lang/String;",
         }
         return mapping.get(idl_type, "I")
+
+    def _jni_field_getter(self, idl_type: str) -> str:
+        """Get JNI field getter method name for a type"""
+        mapping = {
+            "int": "GetIntField",
+            "bool": "GetBooleanField",
+            "float": "GetFloatField",
+            "double": "GetDoubleField",
+        }
+        return mapping.get(idl_type, "GetIntField")

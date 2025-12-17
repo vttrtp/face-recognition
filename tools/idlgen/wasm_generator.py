@@ -30,7 +30,28 @@ class WASMGenerator:
             lines.extend(self._interface_wrapper(iface))
             lines.extend(self._interface_bindings(iface))
 
+        # Generate struct bindings
+        if self.idl.structs:
+            lines.extend(self._struct_bindings())
+
         return "\n".join(lines)
+
+    def _struct_bindings(self) -> list[str]:
+        """Generate Emscripten bindings for structs"""
+        lines = [
+            f"EMSCRIPTEN_BINDINGS({self.namespace}_structs) {{",
+        ]
+        
+        for struct in self.idl.structs:
+            lines.append(f'    value_object<{struct.name}>("{struct.name}")')
+            for m in struct.members:
+                lines.append(f'        .field("{m.name}", &{struct.name}::{m.name})')
+            lines.append("    ;")
+            lines.append("")
+        
+        lines.append("}")
+        lines.append("")
+        return lines
 
     def _interface_wrapper(self, iface: Interface) -> list[str]:
         cpp_class = f"{self.namespace}::{iface.name}"
@@ -106,11 +127,16 @@ class WASMGenerator:
         # Check if we have uint8_t* parameter that needs special handling
         has_uint8_ptr = any(p.type == "uint8_t" and p.is_pointer for p in method.params)
         
+        # Check for callback parameters
+        callback_params = [(p, self._get_callback_def(p.type)) for p in method.params if self._is_callback_type(p.type)]
+        
         # Build argument conversion
         args = []
         for p in method.params:
             if p.type == "uint8_t" and p.is_pointer:
                 args.append(f"{p.name}Vec.data()")
+            elif self._is_callback_type(p.type):
+                args.append(f"{p.name}Wrapper")
             else:
                 args.append(p.name)
         args_str = ", ".join(args)
@@ -122,6 +148,26 @@ class WASMGenerator:
             for p in method.params:
                 if p.type == "uint8_t" and p.is_pointer:
                     lines.append(f"        auto {p.name}Vec = vecFromJSArray<uint8_t>({p.name});")
+        
+        # Add callback wrappers
+        for param, cb_def in callback_params:
+            if cb_def:
+                cb_params = ", ".join(self._wasm_cb_param_type(cp) for cp in cb_def.params)
+                cb_args = ", ".join(cp.name for cp in cb_def.params)
+                cb_return = self._wasm_cb_return_type(cb_def.return_type)
+                
+                if cb_return == "void":
+                    lines.append(f"        auto {param.name}Wrapper = [{param.name}]({cb_params}) {{")
+                    lines.append(f'            {param.name}({cb_args});')
+                    lines.append("        };")
+                elif cb_return == "bool":
+                    lines.append(f"        auto {param.name}Wrapper = [{param.name}]({cb_params}) -> bool {{")
+                    lines.append(f'            return {param.name}({cb_args}).as<bool>();')
+                    lines.append("        };")
+                else:
+                    lines.append(f"        auto {param.name}Wrapper = [{param.name}]({cb_params}) -> {cb_return} {{")
+                    lines.append(f'            return {param.name}({cb_args}).as<{cb_return}>();')
+                    lines.append("        };")
         
         if TypeMapper.is_vector(method.return_type):
             inner = TypeMapper.vector_inner(method.return_type)
@@ -151,9 +197,39 @@ class WASMGenerator:
         lines.append("")
         return lines
 
+    def _is_callback_type(self, type_name: str) -> bool:
+        """Check if type is a callback"""
+        return any(cb.name == type_name for cb in self.idl.callbacks)
+
+    def _get_callback_def(self, type_name: str):
+        """Get callback definition by name"""
+        return next((cb for cb in self.idl.callbacks if cb.name == type_name), None)
+
+    def _wasm_cb_param_type(self, param: Param) -> str:
+        """Get C++ type for callback parameter"""
+        if param.type == "int":
+            return f"int {param.name}"
+        if param.type == "bool":
+            return f"bool {param.name}"
+        if param.type == "double":
+            return f"double {param.name}"
+        return f"int {param.name}"
+
+    def _wasm_cb_return_type(self, ret_type: str) -> str:
+        """Get C++ return type for callback"""
+        if ret_type == "void":
+            return "void"
+        if ret_type == "bool":
+            return "bool"
+        if ret_type == "int":
+            return "int"
+        return "int"
+
     def _wasm_param_type(self, param: Param) -> str:
         """Convert param to WASM-compatible type"""
         if param.type == "uint8_t" and param.is_pointer:
+            return "val"
+        if self._is_callback_type(param.type):
             return "val"
         if param.type == "string":
             return "const std::string&"

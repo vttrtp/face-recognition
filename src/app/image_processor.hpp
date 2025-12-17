@@ -15,7 +15,7 @@ namespace app {
 struct ImageResult {
     std::string original_path;
     std::string result_path;
-    face_detector_client::DetectionResult detection;
+    face_detector_client::FaceDetectorFaceRectResult detection;
     bool success;
     std::string error_message;
 };
@@ -80,7 +80,7 @@ private:
      */
     bool createBlurredImage(const std::string& input_path,
                             const std::string& output_path,
-                            const face_detector_client::DetectionResult& detection);
+                            const face_detector_client::FaceDetectorFaceRectResult& detection);
 
     std::shared_ptr<face_detector_client::FaceDetector> m_detector;
 };

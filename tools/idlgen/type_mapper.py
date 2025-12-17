@@ -131,3 +131,8 @@ class TypeMapper:
     def is_primitive(cls, idl_type: str) -> bool:
         """Check if type is a primitive (not struct/class)"""
         return idl_type in cls.CPP_TYPES or cls.is_vector(idl_type)
+
+    @classmethod
+    def is_callback(cls, idl_type: str, callbacks: list) -> bool:
+        """Check if type is a callback type"""
+        return any(cb.name == idl_type for cb in callbacks)

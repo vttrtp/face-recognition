@@ -8,15 +8,16 @@ from .type_mapper import TypeMapper
 class CAPIGenerator:
     """Generates C API header and implementation"""
 
-    def __init__(self, idl: ParsedIDL, namespace: str):
+    def __init__(self, idl: ParsedIDL, namespace: str, api_macro: str = ""):
         self.idl = idl
         self.namespace = namespace
-        self.api_macro = f"{namespace.upper()}_API"
+        self.api_macro = api_macro or f"{namespace.upper()}_API"
         self.export_macro = f"{namespace.upper()}_EXPORTS"
 
     def generate_header(self) -> str:
         lines = self._header_preamble()
         lines.extend(self._generate_structs())
+        lines.extend(self._generate_callbacks())
         lines.extend(self._generate_interface_decls())
         lines.extend(self._header_postamble())
         return "\n".join(lines)
@@ -26,6 +27,8 @@ class CAPIGenerator:
             "// AUTO-GENERATED - DO NOT EDIT",
             f'#include "{Path(impl_header).name}"',
             f'#include "{self.namespace}_c_api.h"',
+            "",
+            "#include <memory>",
             "",
         ]
         for iface in self.idl.interfaces:
@@ -76,26 +79,46 @@ class CAPIGenerator:
             lines.append("")
         return lines
 
+    def _generate_callbacks(self) -> list[str]:
+        """Generate callback function pointer typedefs"""
+        lines = []
+        for cb in self.idl.callbacks:
+            params = ", ".join(TypeMapper.to_c(p.type) for p in cb.params) or "void"
+            ret = TypeMapper.to_c(cb.return_type)
+            lines.append(f"typedef {ret} (*{cb.name})({params});")
+        if self.idl.callbacks:
+            lines.append("")
+        return lines
+
     def _generate_interface_decls(self) -> list[str]:
         lines = []
         for iface in self.idl.interfaces:
             handle = f"{iface.name}Handle"
-            result = f"{iface.name}Result"
 
             lines.append(f"typedef struct {handle} {handle};")
-            lines.append(f"typedef struct {result} {result};")
+            
+            # Create result struct typedef per unique vector return type
+            vec_methods = [m for m in iface.methods if TypeMapper.is_vector(m.return_type)]
+            result_types = set()
+            for m in vec_methods:
+                inner = TypeMapper.vector_inner(m.return_type)
+                result_types.add(inner)
+            
+            for inner in sorted(result_types):
+                result_name = self._result_struct_name(iface.name, inner)
+                lines.append(f"typedef struct {result_name} {result_name};")
+            
             lines.append("")
 
             for method in iface.methods:
                 lines.extend(self._method_decl(iface, method))
 
-            # Result accessors (once per interface if any method returns vector)
-            vec_methods = [m for m in iface.methods if TypeMapper.is_vector(m.return_type)]
-            if vec_methods:
-                inner = TypeMapper.vector_inner(vec_methods[0].return_type)
-                lines.append(f"{self.api_macro} int {iface.name}_getResultCount(const {result}* result);")
-                lines.append(f"{self.api_macro} const {inner}* {iface.name}_getResultData(const {result}* result);")
-                lines.append(f"{self.api_macro} void {iface.name}_freeResult({result}* result);")
+            # Result accessors per unique vector element type
+            for inner in sorted(result_types):
+                result_name = self._result_struct_name(iface.name, inner)
+                lines.append(f"{self.api_macro} int {result_name}_getCount(const {result_name}* result);")
+                lines.append(f"{self.api_macro} const {inner}* {result_name}_getData(const {result_name}* result);")
+                lines.append(f"{self.api_macro} void {result_name}_free({result_name}* result);")
 
             for member in iface.members:
                 lines.append(self._attr_getter_decl(iface, member))
@@ -103,9 +126,13 @@ class CAPIGenerator:
             lines.append("")
         return lines
 
+    def _result_struct_name(self, iface_name: str, inner_type: str) -> str:
+        """Generate a unique result struct name for interface + element type.
+        Uses underscores and _C suffix to avoid collisions with client wrapper classes."""
+        return f"{iface_name}_{inner_type}_CResult"
+
     def _method_decl(self, iface: Interface, method: Method) -> list[str]:
         h = f"{iface.name}Handle"
-        r = f"{iface.name}Result"
         prefix = iface.name
         lines = []
 
@@ -114,7 +141,7 @@ class CAPIGenerator:
             lines.append(f"{self.api_macro} {h}* {prefix}_create({c_params});")
             lines.append(f"{self.api_macro} void {prefix}_destroy({h}* handle);")
         else:
-            ret = self._c_return_type(method.return_type, r)
+            ret = self._c_return_type_for_method(iface.name, method.return_type)
             params = [f"{h}* handle"] + [self._param_to_c(p) for p in method.params]
             lines.append(f"{self.api_macro} {ret} {prefix}_{method.name}({', '.join(params)});")
 
@@ -128,7 +155,6 @@ class CAPIGenerator:
 
     def _generate_interface_impl(self, iface: Interface) -> list[str]:
         h = f"{iface.name}Handle"
-        r = f"{iface.name}Result"
         cpp_class = f"{self.namespace}::{iface.name}"
         lines = []
 
@@ -138,12 +164,18 @@ class CAPIGenerator:
         lines.append("};")
         lines.append("")
 
-        # Result struct (if needed)
-        vec_types = [TypeMapper.vector_inner(m.return_type) for m in iface.methods if TypeMapper.is_vector(m.return_type)]
-        if vec_types:
-            inner = TypeMapper.to_cpp(vec_types[0])
-            lines.append(f"struct {r} {{")
-            lines.append(f"    std::vector<{inner}> data;")
+        # Result struct per unique vector element type
+        vec_methods = [m for m in iface.methods if TypeMapper.is_vector(m.return_type)]
+        result_types = set()
+        for m in vec_methods:
+            inner = TypeMapper.vector_inner(m.return_type)
+            result_types.add(inner)
+        
+        for inner in sorted(result_types):
+            result_name = self._result_struct_name(iface.name, inner)
+            cpp_inner = TypeMapper.to_cpp(inner)
+            lines.append(f"struct {result_name} {{")
+            lines.append(f"    std::vector<{cpp_inner}> data;")
             lines.append("};")
             lines.append("")
 
@@ -153,20 +185,19 @@ class CAPIGenerator:
         for method in iface.methods:
             lines.extend(self._method_impl(iface, method, cpp_class))
 
-        # Result accessors (once per interface if any method returns vector)
-        vec_methods = [m for m in iface.methods if TypeMapper.is_vector(m.return_type)]
-        if vec_methods:
-            inner = TypeMapper.vector_inner(vec_methods[0].return_type)
+        # Result accessors per unique vector element type
+        for inner in sorted(result_types):
+            result_name = self._result_struct_name(iface.name, inner)
             lines.extend([
-                f"int {iface.name}_getResultCount(const {r}* result) {{",
+                f"int {result_name}_getCount(const {result_name}* result) {{",
                 "    return result ? static_cast<int>(result->data.size()) : -1;",
                 "}",
                 "",
-                f"const {inner}* {iface.name}_getResultData(const {r}* result) {{",
+                f"const {inner}* {result_name}_getData(const {result_name}* result) {{",
                 "    return (result && !result->data.empty()) ? result->data.data() : nullptr;",
                 "}",
                 "",
-                f"void {iface.name}_freeResult({r}* result) {{",
+                f"void {result_name}_free({result_name}* result) {{",
                 "    delete result;",
                 "}",
                 "",
@@ -181,7 +212,6 @@ class CAPIGenerator:
 
     def _method_impl(self, iface: Interface, method: Method, cpp_class: str) -> list[str]:
         h = f"{iface.name}Handle"
-        r = f"{iface.name}Result"
         prefix = iface.name
         lines = []
 
@@ -207,7 +237,7 @@ class CAPIGenerator:
             lines.append("}")
             lines.append("")
         else:
-            ret = self._c_return_type(method.return_type, r)
+            ret = self._c_return_type_for_method(iface.name, method.return_type)
             params = [f"{h}* handle"] + [self._param_to_c(p) for p in method.params]
 
             lines.append(f"{ret} {prefix}_{method.name}({', '.join(params)}) {{")
@@ -217,12 +247,25 @@ class CAPIGenerator:
                 if TypeMapper.is_string(p.type):
                     null_checks.append(f"!{p.name}")
 
-            null_ret = "nullptr" if ret.endswith("*") else ("-1" if ret == "int" else "0")
+            # Determine appropriate null/error return value
+            if ret.endswith("*"):
+                null_ret = "nullptr"
+            elif ret == "int":
+                null_ret = "-1"
+            elif ret in ("bool", "double", "float"):
+                null_ret = "0"
+            elif TypeMapper.is_primitive(method.return_type):
+                null_ret = "0"
+            else:
+                # Struct type - return empty struct
+                null_ret = "{}"
             lines.append(f"    if ({' || '.join(null_checks)}) return {null_ret};")
 
             cpp_args = ", ".join(p.name for p in method.params)
             if TypeMapper.is_vector(method.return_type):
-                lines.append(f"    auto result = new {r}();")
+                inner = TypeMapper.vector_inner(method.return_type)
+                result_name = self._result_struct_name(iface.name, inner)
+                lines.append(f"    auto result = new {result_name}();")
                 lines.append(f"    result->data = handle->impl->{method.name}({cpp_args});")
                 lines.append("    return result;")
             else:
@@ -246,10 +289,18 @@ class CAPIGenerator:
             "",
         ]
 
+    def _is_callback_type(self, type_name: str) -> bool:
+        """Check if type is a callback"""
+        return any(cb.name == type_name for cb in self.idl.callbacks)
+
     def _param_to_c(self, param: Param) -> str:
         """Convert param to C declaration"""
         if param.type == 'string':
             return f'const char* {param.name}'
+        
+        # Callback types are already function pointers
+        if self._is_callback_type(param.type):
+            return f'{param.type} {param.name}'
         
         base = TypeMapper.to_c(param.type)
         if param.is_const:
@@ -260,6 +311,18 @@ class CAPIGenerator:
 
     def _c_params_str(self, params: list[Param]) -> str:
         return ", ".join(self._param_to_c(p) for p in params) or "void"
+
+    def _c_return_type_for_method(self, iface_name: str, idl_type: str) -> str:
+        """Get C return type, using per-method result types for vectors"""
+        if TypeMapper.is_vector(idl_type):
+            inner = TypeMapper.vector_inner(idl_type)
+            result_name = self._result_struct_name(iface_name, inner)
+            return f"{result_name}*"
+        if idl_type == "void":
+            return "void"
+        if idl_type == "bool":
+            return "int"
+        return TypeMapper.to_c(idl_type)
 
     def _c_return_type(self, idl_type: str, result_type: str) -> str:
         if TypeMapper.is_vector(idl_type):

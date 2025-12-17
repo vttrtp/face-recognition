@@ -1,7 +1,7 @@
 """C++-like IDL parser"""
 
 import re
-from .types import Param, Member, Method, Interface, Struct, ParsedIDL
+from .types import Param, Member, Method, Interface, Struct, Callback, ParsedIDL
 
 
 class IDLParser:
@@ -18,6 +18,7 @@ class IDLParser:
     def parse(self) -> ParsedIDL:
         result = ParsedIDL()
         result.structs = self._parse_structs()
+        result.callbacks = self._parse_callbacks()
         result.interfaces = self._parse_interfaces()
         return result
 
@@ -31,6 +32,19 @@ class IDLParser:
                 members.append(Member(name=m.group(2), type=m.group(1)))
             structs.append(Struct(name=name, members=members))
         return structs
+
+    def _parse_callbacks(self) -> list[Callback]:
+        """Parse callback declarations like: callback ProgressCallback(int current, int total) -> void;"""
+        callbacks = []
+        # Match: callback Name(params) -> returnType;
+        pattern = r'callback\s+(\w+)\s*\(([^)]*)\)\s*->\s*(\w+)\s*;'
+        for match in re.finditer(pattern, self.content):
+            name = match.group(1)
+            params_str = match.group(2)
+            return_type = match.group(3)
+            params = self._parse_params(params_str)
+            callbacks.append(Callback(name=name, return_type=return_type, params=params))
+        return callbacks
 
     def _parse_interfaces(self) -> list[Interface]:
         interfaces = []

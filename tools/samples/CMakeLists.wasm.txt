@@ -1,0 +1,70 @@
+# WASM-specific build configuration for samples
+# Build with: emcmake cmake -B build-wasm -S . && emmake cmake --build build-wasm
+
+cmake_minimum_required(VERSION 3.20)
+
+project(samples_wasm VERSION 1.0.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Check for Emscripten
+if(NOT EMSCRIPTEN)
+    message(FATAL_ERROR "This file should only be used with Emscripten. Use emcmake cmake ...")
+endif()
+
+# Find Python for IDL generation
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+# Paths
+set(IDL_GENERATOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../idlgen")
+set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+
+# Ensure directories exist
+file(MAKE_DIRECTORY ${GENERATED_DIR})
+
+# IDL source file
+set(IDL_FILE "${CMAKE_CURRENT_SOURCE_DIR}/samples.idl")
+
+# Generated WASM file
+set(GENERATED_WASM_CPP "${GENERATED_DIR}/samples_wasm_bindings.cpp")
+
+# Generator source files (for dependency tracking)
+file(GLOB IDL_GENERATOR_SOURCES "${IDL_GENERATOR_DIR}/*.py")
+
+# Custom command to generate WASM bindings from IDL
+add_custom_command(
+    OUTPUT ${GENERATED_WASM_CPP}
+    COMMAND ${Python3_EXECUTABLE} 
+        "${CMAKE_CURRENT_SOURCE_DIR}/../generate_bindings.py"
+        "${IDL_FILE}"
+        --output-dir "${GENERATED_DIR}"
+        --namespace "samples"
+        --impl-header "samples.hpp"
+        --api-macro "SAMPLES_API"
+    DEPENDS ${IDL_FILE} ${IDL_GENERATOR_SOURCES}
+    COMMENT "Generating WASM bindings from samples.idl"
+    VERBATIM
+)
+
+# Custom target for generation
+add_custom_target(generate_wasm_bindings DEPENDS ${GENERATED_WASM_CPP})
+
+# WASM executable
+add_executable(samples_wasm
+    samples.cpp
+    ${GENERATED_WASM_CPP}
+)
+
+target_include_directories(samples_wasm PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${GENERATED_DIR}
+)
+
+add_dependencies(samples_wasm generate_wasm_bindings)
+
+# Emscripten settings
+set_target_properties(samples_wasm PROPERTIES
+    SUFFIX ".js"
+    LINK_FLAGS "-lembind -s MODULARIZE=1 -s EXPORT_NAME='SamplesModule' -s ALLOW_MEMORY_GROWTH=1 -s ENVIRONMENT=node,web,worker"
+)

@@ -15,11 +15,11 @@ struct DetectorDeleter {
 };
 
 struct ResultDeleter {
-    void operator()(FaceDetectorResult* p) const { FaceDetector_freeResult(p); }
+    void operator()(FaceDetector_FaceRect_CResult* p) const { FaceDetector_FaceRect_CResult_free(p); }
 };
 
 using DetectorPtr = std::unique_ptr<FaceDetectorHandle, DetectorDeleter>;
-using ResultPtr = std::unique_ptr<FaceDetectorResult, ResultDeleter>;
+using ResultPtr = std::unique_ptr<FaceDetector_FaceRect_CResult, ResultDeleter>;
 
 }  // namespace
 
@@ -166,11 +166,12 @@ TEST_F(FaceDetectorTest, CAPIDetectFaces) {
     ResultPtr result(FaceDetector_detectFromFile(detector.get(), test_image_path.c_str()));
     ASSERT_NE(result, nullptr);
     
-    int count = FaceDetector_getResultCount(result.get());
+    int count = FaceDetector_FaceRect_CResult_getCount(result.get());
     EXPECT_GT(count, 0) << "Expected to detect faces in test image";
     
-    const FaceRect* faces = FaceDetector_getResultData(result.get());
+    const FaceRect* faces = FaceDetector_FaceRect_CResult_getData(result.get());
     ASSERT_NE(faces, nullptr);
     EXPECT_GT(faces[0].width, 0);
     EXPECT_GT(faces[0].height, 0);
 }
+
