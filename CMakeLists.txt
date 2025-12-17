@@ -26,8 +26,12 @@ if(NOT EMSCRIPTEN)
 endif()
 
 # Find required packages
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs objdetect)
 find_package(jsoncpp CONFIG REQUIRED)
+
+# Generated bindings (must come before facedetector)
+add_subdirectory(src/generated)
 
 # Subdirectories
 add_subdirectory(src/facedetector)
@@ -40,6 +44,11 @@ endif()
 # App uses dlopen which is not available in WASM
 if(NOT EMSCRIPTEN)
     add_subdirectory(src/app)
+endif()
+
+# Java JNI bindings (optional)
+if(NOT EMSCRIPTEN)
+    include(JavaJNI)
 endif()
 
 # Tests

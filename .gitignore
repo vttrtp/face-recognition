@@ -40,3 +40,12 @@ Thumbs.db
 
 #results
 results/
+generated/
+
+#ignore python cache
+__pycache__/
+*.pyc
+
+# Generated Java files
+samples/java/src/main/java/face/detector/FaceDetector.java
+samples/java/out/

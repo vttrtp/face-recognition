@@ -181,15 +181,19 @@
         const faceCountEl = document.getElementById('faceCount');
         const faceListEl = document.getElementById('faceList');
         
-        // Load cascade file
+        // Load cascade file and save to virtual filesystem
         async function loadCascadeFile() {
             const cascadeUrl = 'haarcascade_frontalface_default.xml';
+            const cascadePath = '/cascade.xml';
             try {
                 const response = await fetch(cascadeUrl);
                 if (!response.ok) {
                     throw new Error(`Failed to load cascade file: ${response.status}`);
                 }
-                return await response.text();
+                const cascadeData = await response.text();
+                // Write to Emscripten virtual filesystem
+                Module.FS.writeFile(cascadePath, cascadeData);
+                return cascadePath;
             } catch (error) {
                 console.error('Error loading cascade:', error);
                 throw error;
@@ -207,9 +211,9 @@
                 
                 // Load cascade classifier
                 statusEl.textContent = '⏳ Loading cascade classifier...';
-                const cascadeData = await loadCascadeFile();
+                const cascadePath = await loadCascadeFile();
                 
-                if (!faceDetector.loadCascade(cascadeData)) {
+                if (!faceDetector.create(cascadePath)) {
                     throw new Error('Failed to load cascade classifier');
                 }
                 
@@ -301,8 +305,8 @@
                     
                     // Detect faces and measure time
                     const startTime = performance.now();
-                    const faces = faceDetector.detectFaces(
-                        imageData.data,
+                    const faces = faceDetector.detectFromImageData(
+                        Array.from(imageData.data),
                         canvas.width,
                         canvas.height
                     );

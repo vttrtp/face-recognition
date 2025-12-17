@@ -77,4 +77,17 @@ DetectResult FaceDetector::detect(std::string_view image_path) {
     return detect(image);
 }
 
+std::vector<FaceRect> FaceDetector::detectFromImageData(const uint8_t* imageData, int width, int height) {
+    if (!isLoaded() || !imageData || width <= 0 || height <= 0) {
+        return {};
+    }
+
+    // Create Mat from RGBA data (4 channels)
+    cv::Mat rgba(height, width, CV_8UC4, const_cast<uint8_t*>(imageData));
+    cv::Mat bgr;
+    cv::cvtColor(rgba, bgr, cv::COLOR_RGBA2BGR);
+    
+    return detect(bgr).faces;
+}
+
 } // namespace face_detector

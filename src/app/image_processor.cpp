@@ -1,5 +1,5 @@
 #include "image_processor.hpp"
-#include "face_detector_wrapper.hpp"
+#include "face_detector_client.hpp"
 #include "file_utils.hpp"
 
 #include <opencv2/imgcodecs.hpp>
@@ -20,17 +20,17 @@ static const std::vector<std::string> IMAGE_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"
 };
 
-ImageProcessor::ImageProcessor(const std::shared_ptr<FaceDetectorWrapper>& detector)
+ImageProcessor::ImageProcessor(const std::shared_ptr<face_detector_client::FaceDetector>& detector)
     : m_detector(detector) {
 }
 
 bool ImageProcessor::isReady() const {
-    return m_detector && m_detector->isReady();
+    return m_detector && m_detector->isLoaded();
 }
 
 bool ImageProcessor::createBlurredImage(const std::string& input_path,
                                          const std::string& output_path,
-                                         const DetectionResultData& detection) {
+                                         const face_detector_client::DetectionResult& detection) {
     cv::Mat image = cv::imread(input_path);
     if (image.empty()) {
         return false;
@@ -41,7 +41,7 @@ bool ImageProcessor::createBlurredImage(const std::string& input_path,
     cv::resize(image, resized, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
 
     // Blur face regions (scaled to half size)
-    const FaceRect* faces = detection.data();
+    const face_detector_client::FaceRect* faces = detection.data();
     for (int i = 0; i < detection.count(); ++i) {
         const auto& face = faces[i];
         // Scale face coordinates to resized image
@@ -80,7 +80,7 @@ ImageResult ImageProcessor::processImage(const fs::path& image_path,
     result.original_path = image_path.string();
     result.success = false;
 
-    result.detection = m_detector->detect(image_path.string());
+    result.detection = m_detector->detectFromFile(image_path.string());
 
     // Determine output directory
     fs::path output_dir;
@@ -148,7 +148,7 @@ bool ImageProcessor::saveResultsToJson(const std::vector<ImageResult>& results,
         }
 
         Json::Value faces_array(Json::arrayValue);
-        const FaceRect* faces = result.detection.data();
+        const face_detector_client::FaceRect* faces = result.detection.data();
         for (int i = 0; i < result.detection.count(); ++i) {
             const auto& face = faces[i];
             Json::Value face_obj;

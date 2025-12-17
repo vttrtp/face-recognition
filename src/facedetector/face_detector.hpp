@@ -1,6 +1,6 @@
 #pragma once
 
-#include "face_detector_interface.h"
+#include "face_detector_c_api.h"
 
 #include <string>
 #include <string_view>
@@ -57,6 +57,24 @@ public:
      * @return DetectResult with vector of faces
      */
     [[nodiscard]] DetectResult detect(std::string_view image_path);
+
+    /**
+     * @brief Detect faces in an image file (IDL-compatible name)
+     * @param image_path Path to the image file
+     * @return vector of faces
+     */
+    [[nodiscard]] std::vector<FaceRect> detectFromFile(const std::string& image_path) {
+        return detect(image_path).faces;
+    }
+
+    /**
+     * @brief Detect faces from raw RGBA image data (IDL-compatible)
+     * @param imageData Pointer to RGBA pixel data
+     * @param width Image width in pixels
+     * @param height Image height in pixels
+     * @return vector of faces
+     */
+    [[nodiscard]] std::vector<FaceRect> detectFromImageData(const uint8_t* imageData, int width, int height);
 
 private:
     cv::CascadeClassifier cascade_;

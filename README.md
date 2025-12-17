@@ -4,6 +4,7 @@ A cross-platform C++ application for detecting faces in images. The project cons
 - A dynamic library (`face_detector`) for face detection using OpenCV Haar cascades
 - A console application that processes images recursively and saves results
 - A WebAssembly (WASM) module for browser-based face detection
+- **Automatic binding generation** from IDL for C++ runtime loading, Java JNI, and WebAssembly
 
 **[🔗 Live Demo](https://vttrtp.github.io/face-recognition/)**
 
@@ -17,11 +18,17 @@ A cross-platform C++ application for detecting faces in images. The project cons
 - Saves detection results in JSON format
 - Dynamic library loading at runtime
 - Web-based face detection demo using WebAssembly
+- **IDL-based code generation** for multiple platforms:
+  - C API with dynamic library export and import
+  - C++ client wrapper with runtime library loading
+  - Emscripten/WebAssembly bindings
+  - Java JNI bindings
 
 ## Requirements
 
 - CMake 3.16+
 - C++17 compatible compiler
+- Python 3.8+ (for code generation)
 - Ninja build system
 - vcpkg package manager
 - Emscripten SDK (for WASM build)
@@ -175,19 +182,67 @@ The demo allows you to:
 
 ```
 face-recognition/
-├── CMakeLists.txt          # Root CMake configuration
-├── CMakePresets.json       # CMake presets for vcpkg
-├── vcpkg.json              # vcpkg dependencies manifest
-├── cmake/                  # CMake helper modules
-├── triplets/               # Custom vcpkg triplets
+├── CMakeLists.txt              # Root CMake configuration
+├── CMakePresets.json           # CMake presets for vcpkg
+├── vcpkg.json                  # vcpkg dependencies manifest
+├── cmake/                      # CMake helper modules
+├── triplets/                   # Custom vcpkg triplets
+├── tools/
+│   ├── generate_bindings.py    # Main code generator script
+│   └── idlgen/                 # Code generator package
+│       ├── parser.py           # IDL parser (C++-like syntax)
+│       ├── type_mapper.py      # Type mapping utilities
+│       ├── c_api_generator.py  # C API generator
+│       ├── client_generator.py # C++ client wrapper generator
+│       ├── wasm_generator.py   # Emscripten bindings generator
+│       └── jni_generator.py    # Java JNI bindings generator
 ├── src/
-│   ├── facedetector/       # Face detector library
-│   ├── app/                # Console application
-│   ├── wasm/               # WebAssembly bindings
-│   └── web/                # Web demo
-└── tests/                  # Unit tests
-    └── data/               # Test data
+│   ├── facedetector/           # Face detector library implementation
+│   │   └── face_detector.idl   # IDL interface definition
+│   ├── generated/              # Auto-generated bindings (C API, WASM, JNI)
+│   ├── app/                    # Console application
+│   ├── wasm/                   # WebAssembly module
+│   └── web/                    # Web demo HTML
+├── samples/
+│   └── java/                   # Java JNI sample application
+└── tests/                      # Unit tests
 ```
+
+## Code Generation
+
+The project uses a custom IDL (Interface Definition Language) to automatically generate:
+- **C API** - Exported functions for the shared library
+- **C++ Client** - Wrapper with dynamic library loading
+- **WASM Bindings** - Emscripten JavaScript interop
+- **Java JNI** - Native bindings for Java applications
+
+### IDL Syntax (C++-like)
+
+```cpp
+struct FaceRect {
+    int x;
+    int y;
+    int width;
+    int height;
+};
+
+interface FaceDetector {
+    constructor(const string& cascadePath);
+    bool isLoaded() const;
+    vector<FaceRect> detectFromFile(const string& imagePath);
+};
+```
+
+### Generate Bindings
+
+```bash
+python tools/generate_bindings.py src/facedetector/face_detector.idl \
+    --namespace face_detector \
+    --output-dir src/generated \
+    --java --java-output-dir samples/java/src/main/java
+```
+
+Bindings are auto-regenerated during CMake build when the IDL file changes.
 
 ## License
 

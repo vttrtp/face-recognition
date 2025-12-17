@@ -1,0 +1,26 @@
+// Face Detector IDL
+// Generates:
+//   - C API exports for shared library
+//   - C++ import wrapper for dynamic loading  
+//   - Emscripten bindings for WASM
+
+struct FaceRect {
+    int x;
+    int y;
+    int width;
+    int height;
+};
+
+interface FaceDetector {
+    // Constructor loads the cascade classifier
+    FaceDetector(const string& cascadePath);
+
+    // Check if detector is properly initialized
+    bool isLoaded() const;
+
+    // Detect faces in an image file
+    vector<FaceRect> detectFromFile(const string& imagePath);
+
+    // Detect faces from raw image data (RGBA pixels)
+    vector<FaceRect> detectFromImageData(const uint8_t* imageData, int width, int height);
+};

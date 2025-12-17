@@ -2,7 +2,7 @@ if(EMSCRIPTEN)
     set(WASM_TARGET face_detector_wasm)
     
     add_executable(${WASM_TARGET}
-        wasm_bindings.cpp
+        ${CMAKE_SOURCE_DIR}/src/generated/face_detector_wasm_bindings.cpp
     )
     
     target_link_libraries(${WASM_TARGET}
@@ -14,6 +14,7 @@ if(EMSCRIPTEN)
     target_include_directories(${WASM_TARGET}
         PRIVATE
             ${CMAKE_SOURCE_DIR}/src/facedetector
+            ${CMAKE_SOURCE_DIR}/src/generated
     )
     
     # Emscripten specific flags
@@ -25,7 +26,8 @@ if(EMSCRIPTEN)
             -s EXPORT_NAME='createFaceDetectorModule' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s MAXIMUM_MEMORY=512MB \
-            -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap'] \
+            -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS'] \
+            -s FORCE_FILESYSTEM=1 \
             --bind \
             -s FETCH=1 \
         "

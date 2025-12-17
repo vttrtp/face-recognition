@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "face_detector.hpp"
+#include "face_detector_c_api.h"
 
 #include <opencv2/imgcodecs.hpp>
 
@@ -10,15 +11,15 @@
 namespace {
 
 struct DetectorDeleter {
-    void operator()(void* p) const { destroy_detector(p); }
+    void operator()(FaceDetectorHandle* p) const { FaceDetector_destroy(p); }
 };
 
 struct ResultDeleter {
-    void operator()(DetectionResult* p) const { free_detection_result(p); }
+    void operator()(FaceDetectorResult* p) const { FaceDetector_freeResult(p); }
 };
 
-using DetectorPtr = std::unique_ptr<void, DetectorDeleter>;
-using ResultPtr = std::unique_ptr<DetectionResult, ResultDeleter>;
+using DetectorPtr = std::unique_ptr<FaceDetectorHandle, DetectorDeleter>;
+using ResultPtr = std::unique_ptr<FaceDetectorResult, ResultDeleter>;
 
 }  // namespace
 
@@ -135,35 +136,40 @@ TEST_F(FaceDetectorTest, DetectFromRealImage) {
 
 // Test: C API - create and destroy detector
 TEST_F(FaceDetectorTest, CAPICreateDestroy) {
-    DetectorPtr detector(create_detector(cascade_path.c_str()));
+    DetectorPtr detector(FaceDetector_create(cascade_path.c_str()));
     ASSERT_NE(detector, nullptr);
 }
 
 // Test: C API - null/invalid inputs return nullptr
 TEST_F(FaceDetectorTest, CAPIErrorHandling) {
-    EXPECT_EQ(create_detector(nullptr), nullptr);
-    EXPECT_EQ(create_detector("non_existent.xml"), nullptr);
-    EXPECT_EQ(detect_faces(nullptr, "test.jpg"), nullptr);
+    EXPECT_EQ(FaceDetector_create(nullptr), nullptr);
     
-    DetectorPtr detector(create_detector(cascade_path.c_str()));
+    // Creating detector with invalid cascade is allowed, but it will not be loaded
+    DetectorPtr invalid_detector(FaceDetector_create("non_existent.xml"));
+    ASSERT_NE(invalid_detector, nullptr);
+    EXPECT_FALSE(FaceDetector_isLoaded(invalid_detector.get()));
+    
+    EXPECT_EQ(FaceDetector_detectFromFile(nullptr, "test.jpg"), nullptr);
+    
+    DetectorPtr detector(FaceDetector_create(cascade_path.c_str()));
     ASSERT_NE(detector, nullptr);
-    EXPECT_EQ(detect_faces(detector.get(), nullptr), nullptr);
+    EXPECT_EQ(FaceDetector_detectFromFile(detector.get(), nullptr), nullptr);
 }
 
 // Test: C API - detect faces in real image
 TEST_F(FaceDetectorTest, CAPIDetectFaces) {
     ASSERT_FALSE(test_image_path.empty()) << "Test image not found";
     
-    DetectorPtr detector(create_detector(cascade_path.c_str()));
+    DetectorPtr detector(FaceDetector_create(cascade_path.c_str()));
     ASSERT_NE(detector, nullptr);
 
-    ResultPtr result(detect_faces(detector.get(), test_image_path.c_str()));
+    ResultPtr result(FaceDetector_detectFromFile(detector.get(), test_image_path.c_str()));
     ASSERT_NE(result, nullptr);
     
-    int count = get_faces_count(result.get());
+    int count = FaceDetector_getResultCount(result.get());
     EXPECT_GT(count, 0) << "Expected to detect faces in test image";
     
-    const FaceRect* faces = get_faces_data(result.get());
+    const FaceRect* faces = FaceDetector_getResultData(result.get());
     ASSERT_NE(faces, nullptr);
     EXPECT_GT(faces[0].width, 0);
     EXPECT_GT(faces[0].height, 0);

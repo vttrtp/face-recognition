@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <memory>
 
-#include "face_detector_wrapper.hpp"
+#include "face_detector_client.hpp"
 
 namespace app {
 
@@ -15,7 +15,7 @@ namespace app {
 struct ImageResult {
     std::string original_path;
     std::string result_path;
-    DetectionResultData detection;
+    face_detector_client::DetectionResult detection;
     bool success;
     std::string error_message;
 };
@@ -29,10 +29,10 @@ struct ImageResult {
 class ImageProcessor {
 public:
     /**
-     * @brief Construct processor with face detector wrapper
-     * @param detector Shared pointer to face detector wrapper
+     * @brief Construct processor with face detector
+     * @param detector Shared pointer to face detector
      */
-    explicit ImageProcessor(const std::shared_ptr<FaceDetectorWrapper>& detector);
+    explicit ImageProcessor(const std::shared_ptr<face_detector_client::FaceDetector>& detector);
     
     ~ImageProcessor() = default;
 
@@ -80,9 +80,9 @@ private:
      */
     bool createBlurredImage(const std::string& input_path,
                             const std::string& output_path,
-                            const DetectionResultData& detection);
+                            const face_detector_client::DetectionResult& detection);
 
-    std::shared_ptr<FaceDetectorWrapper> m_detector;
+    std::shared_ptr<face_detector_client::FaceDetector> m_detector;
 };
 
 } // namespace app
