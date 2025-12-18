@@ -244,15 +244,6 @@ The project uses a custom IDL (Interface Definition Language) to automatically g
 - **WASM Bindings** - Emscripten JavaScript interop
 - **Java JNI** - Native bindings for Java applications
 
-### Generate Bindings
-
-```bash
-python idlgen/bin/generate_bindings.py src/facedetector/face_detector.idl \
-    --namespace face_detector \
-    --output-dir src/generated \
-    --java --java-output-dir src/java/src/main/java
-```
-
 Bindings are auto-regenerated during CMake build when the IDL file changes.
 
 ## License

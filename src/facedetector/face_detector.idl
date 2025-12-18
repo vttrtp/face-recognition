@@ -12,7 +12,7 @@ struct FaceRect {
     int height;
 };
 
-interface FaceDetector {
+class FaceDetector {
     // Constructor loads the cascade classifier
     FaceDetector(const string& cascadePath);
 
