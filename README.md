@@ -92,7 +92,8 @@ The project uses CMake presets for easy building. Make sure vcpkg is installed a
 |--------|-------------|-----------------|
 | `default` | Release build with vcpkg | `build/` |
 | `debug` | Debug build with vcpkg | `build-debug/` |
-| `wasm` | WASM build with Emscripten + vcpkg | `build-wasm/` |
+| `wasm` | WASM build (single-threaded) | `build-wasm/` |
+| `wasm-threads` | WASM build with pthreads (**3x faster**) | `build-wasm-threads/` |
 
 **Native build:**
 ```bash
@@ -183,22 +184,36 @@ Or run the test executable directly:
 
 ## WebAssembly Build
 
-### Building the WASM Module
+Two WASM build options are available:
+
+| Build | Performance | Browser Support | Notes |
+|-------|-------------|-----------------|-------|
+| `wasm` | Baseline | All browsers | Simple, works everywhere |
+| `wasm-threads` | **~3x faster** | Modern browsers | Requires COOP/COEP headers |
+
+### Single-Threaded Build
 
 ```bash
 cmake --preset wasm
 cmake --build --preset wasm
 ```
 
-This will:
-1. Build the face detector library for WebAssembly
-2. Create WASM bindings with Emscripten
-3. Copy all necessary files to `build-wasm/web/`
+### Multithreaded Build
+
+```bash
+cmake --preset wasm-threads
+cmake --build --preset wasm-threads
+```
+
+The multithreaded build uses WebAssembly pthreads and SharedArrayBuffer for parallel processing, achieving approximately **3x faster** face detection compared to single-threaded WASM.
+
+**Requirements for multithreaded WASM:**
+- Modern browser with SharedArrayBuffer support
+- Server must send COOP/COEP headers (included via `coi-serviceworker.js` for GitHub Pages)
 
 ### Running the Web Demo
 
-Start a local HTTP server in the web directory:
-
+**Single-threaded (simple HTTP server):**
 ```bash
 cd build-wasm/web
 python3 -m http.server 8080

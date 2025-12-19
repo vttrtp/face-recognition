@@ -57,6 +57,15 @@
       }
     },
     {
+      "name": "wasm-threads",
+      "inherits": "wasm",
+      "binaryDir": "${sourceDir}/build-wasm-threads",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "wasm32-emscripten-threads",
+        "WASM_THREADS": "ON"
+      }
+    },
+    {
       "name": "idl-wasm",
       "inherits": "wasm-base",
       "binaryDir": "${sourceDir}/build-wasm-idl",
@@ -79,6 +88,10 @@
     {
       "name": "wasm",
       "configurePreset": "wasm"
+    },
+    {
+      "name": "wasm-threads",
+      "configurePreset": "wasm-threads"
     },
     {
       "name": "idl-wasm",
