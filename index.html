@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Face Detection - WebAssembly Demo</title>
+    <!-- Enable SharedArrayBuffer on GitHub Pages (for pthreads support) -->
+    <script src="coi-serviceworker.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -181,15 +183,19 @@
         const faceCountEl = document.getElementById('faceCount');
         const faceListEl = document.getElementById('faceList');
         
-        // Load cascade file
+        // Load cascade file and save to virtual filesystem
         async function loadCascadeFile() {
             const cascadeUrl = 'haarcascade_frontalface_default.xml';
+            const cascadePath = '/cascade.xml';
             try {
                 const response = await fetch(cascadeUrl);
                 if (!response.ok) {
                     throw new Error(`Failed to load cascade file: ${response.status}`);
                 }
-                return await response.text();
+                const cascadeData = await response.text();
+                // Write to Emscripten virtual filesystem
+                Module.FS.writeFile(cascadePath, cascadeData);
+                return cascadePath;
             } catch (error) {
                 console.error('Error loading cascade:', error);
                 throw error;
@@ -207,9 +213,9 @@
                 
                 // Load cascade classifier
                 statusEl.textContent = '⏳ Loading cascade classifier...';
-                const cascadeData = await loadCascadeFile();
+                const cascadePath = await loadCascadeFile();
                 
-                if (!faceDetector.loadCascade(cascadeData)) {
+                if (!faceDetector.create(cascadePath)) {
                     throw new Error('Failed to load cascade classifier');
                 }
                 
@@ -285,6 +291,59 @@
             reader.readAsDataURL(file);
         });
         
+        // Helper function to display detection results
+        function displayDetectionResults(faces, durationMs) {
+            // Redraw original image
+            ctx.drawImage(currentImage, 0, 0);
+            
+            // Draw rectangles around faces
+            ctx.lineWidth = 3;
+            ctx.font = 'bold 16px Arial';
+            
+            faceListEl.innerHTML = '';
+            
+            for (let i = 0; i < faces.length; i++) {
+                const face = faces[i];
+                
+                // Draw black outline for rectangle
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 5;
+                ctx.strokeRect(face.x, face.y, face.width, face.height);
+                
+                // Draw green rectangle
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(face.x, face.y, face.width, face.height);
+                
+                // Draw label
+                const label = `Face ${i + 1}`;
+                const labelX = face.x;
+                const labelY = face.y - 8;
+                
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 3;
+                ctx.strokeText(label, labelX, labelY);
+                
+                ctx.fillStyle = '#00ff00';
+                ctx.fillText(label, labelX, labelY);
+                
+                // Add to list
+                const li = document.createElement('li');
+                li.textContent = `Face ${i + 1}: Position (${face.x}, ${face.y}), Size: ${face.width}×${face.height}`;
+                faceListEl.appendChild(li);
+            }
+            
+            // Update status and results
+            faceCountEl.textContent = `Found ${faces.length} face(s)`;
+            resultsEl.classList.remove('hidden');
+            
+            const timingText = durationMs !== undefined ? ` in ${durationMs.toFixed(1)} ms` : '';
+            statusEl.textContent = `✅ Detection complete! Found ${faces.length} face(s)${timingText}`;
+            statusEl.className = 'status-ready';
+            
+            detectBtn.disabled = false;
+        }
+        
         // Handle detection
         detectBtn.addEventListener('click', () => {
             if (!currentImage || !faceDetector) return;
@@ -293,78 +352,27 @@
             statusEl.textContent = '🔍 Detecting faces...';
             statusEl.className = 'status-loading';
             
-            // Use setTimeout to allow UI update
             setTimeout(() => {
                 try {
-                    // Get image data from canvas
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     
-                    // Detect faces and measure time
                     const startTime = performance.now();
-                    const faces = faceDetector.detectFaces(
+                    const faces = faceDetector.detectFromImageData(
                         imageData.data,
                         canvas.width,
                         canvas.height
                     );
                     const endTime = performance.now();
-                    const detectionTime = (endTime - startTime).toFixed(1);
+                    const detectionTime = parseFloat((endTime - startTime).toFixed(1));
                     
-                    // Redraw original image
-                    ctx.drawImage(currentImage, 0, 0);
-                    
-                    // Draw rectangles around faces with outline for better visibility
-                    ctx.lineWidth = 3;
-                    ctx.font = 'bold 16px Arial';
-                    
-                    faceListEl.innerHTML = '';
-                    
-                    for (let i = 0; i < faces.length; i++) {
-                        const face = faces[i];
-                        
-                        // Draw black outline for rectangle
-                        ctx.strokeStyle = '#000000';
-                        ctx.lineWidth = 5;
-                        ctx.strokeRect(face.x, face.y, face.width, face.height);
-                        
-                        // Draw green rectangle
-                        ctx.strokeStyle = '#00ff00';
-                        ctx.lineWidth = 3;
-                        ctx.strokeRect(face.x, face.y, face.width, face.height);
-                        
-                        // Draw label with outline
-                        const label = `Face ${i + 1}`;
-                        const labelX = face.x;
-                        const labelY = face.y - 8;
-                        
-                        // Black outline for text
-                        ctx.strokeStyle = '#000000';
-                        ctx.lineWidth = 3;
-                        ctx.strokeText(label, labelX, labelY);
-                        
-                        // Green fill for text
-                        ctx.fillStyle = '#00ff00';
-                        ctx.fillText(label, labelX, labelY);
-                        
-                        // Add to list
-                        const li = document.createElement('li');
-                        li.textContent = `Face ${i + 1}: Position (${face.x}, ${face.y}), Size: ${face.width}×${face.height}`;
-                        faceListEl.appendChild(li);
-                    }
-                    
-                    // Update status and results
-                    faceCountEl.textContent = `Found ${faces.length} face(s)`;
-                    resultsEl.classList.remove('hidden');
-                    
-                    statusEl.textContent = `✅ Detection complete! Found ${faces.length} face(s) in ${detectionTime} ms.`;
-                    statusEl.className = 'status-ready';
+                    displayDetectionResults(faces, detectionTime);
                     
                 } catch (error) {
                     statusEl.textContent = `❌ Detection error: ${error.message}`;
                     statusEl.className = 'status-error';
                     console.error('Detection error:', error);
+                    detectBtn.disabled = false;
                 }
-                
-                detectBtn.disabled = false;
             }, 10);
         });
         
