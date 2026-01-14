@@ -1,33 +1,23 @@
-set(APP_NAME face_recognition_app)
+# Face Recognition App - using idl_target with dynamic loading
 
-add_executable(${APP_NAME}
-    main.cpp
-    image_processor.cpp
-    file_utils.cpp
-    ${CMAKE_SOURCE_DIR}/src/generated/face_detector_client.cpp
-)
-
-target_include_directories(${APP_NAME}
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/src/facedetector
-        ${CMAKE_SOURCE_DIR}/src/generated
-)
-
-target_link_libraries(${APP_NAME}
-    PRIVATE
+idl_target(
+    NAME face_recognition_app
+    TYPE EXECUTABLE
+    SOURCES
+        main.cpp
+        image_processor.cpp
+        file_utils.cpp
+    DYNAMIC_DEPENDENCIES face_detector
+    LINK_LIBRARIES
         ${OpenCV_LIBS}
         JsonCpp::JsonCpp
-        ${CMAKE_DL_LIBS}
 )
 
 # Copy data and library to output directory
-copy_data_to_target(${APP_NAME})
-copy_library_to_target(${APP_NAME} face_detector)
-
-add_dependencies(${APP_NAME} face_detector)
+idl_copy_data_to_target(face_recognition_app ${CMAKE_BINARY_DIR}/data)
+idl_copy_library_to_target(face_recognition_app face_detector)
 
 # Install target
-install(TARGETS ${APP_NAME}
+install(TARGETS face_recognition_app
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

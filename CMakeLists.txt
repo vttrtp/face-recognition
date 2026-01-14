@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(CopyHelpers)
+include(IdlTarget)
 
 # Install directories
 include(GNUInstallDirs)
@@ -30,23 +31,18 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs objdetect)
 find_package(jsoncpp CONFIG REQUIRED)
 
-# Generated bindings (must come before facedetector)
-add_subdirectory(src/generated)
-
-# Subdirectories
+# Face detector library (generates all bindings via idl_target)
 add_subdirectory(src/facedetector)
 
-# WASM bindings
-if(EMSCRIPTEN)
-    add_subdirectory(src/wasm)
-endif()
+# WASM bindings (skipped automatically if not Emscripten)
+add_subdirectory(src/wasm)
 
 # App uses dlopen which is not available in WASM
 if(NOT EMSCRIPTEN)
     add_subdirectory(src/app)
 endif()
 
-# Java JNI bindings (optional)
+# Java JNI bindings (skipped automatically if JNI not found or Emscripten)
 if(NOT EMSCRIPTEN)
     include(JavaJNI)
 endif()

@@ -1,16 +1,9 @@
 // Face Detector IDL
 // Generates:
 //   - C API exports for shared library
-//   - C++ import wrapper for dynamic loading  
+//   - C++ import wrapper for dynamic loading
 //   - Emscripten bindings for WASM
 //   - JNI bindings for Java
-
-struct FaceRect {
-    int x;
-    int y;
-    int width;
-    int height;
-};
 
 class FaceDetector {
     // Constructor loads the cascade classifier

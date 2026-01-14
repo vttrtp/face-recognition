@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
     std::cout << "====================================" << std::endl;
 
     // Load the face detector library dynamically
-    if (!face_detector_client::initialize(library_path)) {
+    if (!idl_client::initialize(library_path)) {
         std::cerr << "Error: failed to load face_detector library" << std::endl;
         return 1;
     }

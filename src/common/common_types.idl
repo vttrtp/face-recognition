@@ -1,0 +1,9 @@
+// Common Types IDL
+// Shared types used across face detection modules
+
+struct FaceRect {
+    int x;
+    int y;
+    int width;
+    int height;
+};
